@@ -47,16 +47,13 @@
 
     <style>
         :root {
-            /* Default Dark Theme */
-            --color-turq: #40E0D0; /* App Accent */
-            --color-dark: #121212; /* Background */
-            --color-panel: #1E1E1E; /* UI Panels */
+            --color-turq: #40E0D0;
+            --color-dark: #121212;
+            --color-panel: #1E1E1E;
             --color-text: #ffffff;
-            
-            /* Category Colors */
-            --color-walkrun: #22c55e; /* Green */
-            --color-cycle: #f97316;   /* Orange */
-            --color-bike: #ef4444;    /* Red */
+            --color-walkrun: #22c55e;
+            --color-cycle: #f97316;
+            --color-bike: #ef4444;
         }
         body { font-family: 'Inter', sans-serif; background-color: var(--color-dark); color: var(--color-text); overflow: hidden; overscroll-behavior: none; }
         .hide-scroll::-webkit-scrollbar { display: none; }
@@ -64,13 +61,11 @@
         
         #map { z-index: 10; background-color: var(--color-dark); }
         .leaflet-control-container .leaflet-routing-container-hide { display: none; }
-        .leaflet-bottom.leaflet-right { display: none; } /* Hide attribution for cleaner UI */
+        .leaflet-bottom.leaflet-right { display: none; }
         
-        /* Map Custom Elements */
         .custom-flag-icon { background: none; border: none; outline: none; }
         .custom-div-icon div { transition: all 0.3s ease; }
         
-        /* Bright Theme Contrast Overrides */
         body.theme-bright .text-gray-400 { color: #6b7280 !important; }
         body.theme-bright .text-gray-500 { color: #4b5563 !important; }
         body.theme-bright .text-gray-600 { color: #374151 !important; }
@@ -78,39 +73,22 @@
         body.theme-bright .bg-gray-700 { background-color: #e5e7eb !important; color: #111827 !important; }
         body.theme-bright .border-gray-800, body.theme-bright .border-gray-700 { border-color: #d1d5db !important; }
         body.theme-bright .text-white { color: #111827 !important; }
-        body.theme-bright .text-dark { color: #ffffff !important; } /* Forces white text on Turquoise buttons for readability */
+        body.theme-bright .text-dark { color: #ffffff !important; }
         body.theme-bright .bg-dark\/90 { background-color: rgba(243, 244, 246, 0.95) !important; }
         body.theme-bright .bg-panel\/85, body.theme-bright .bg-panel\/90, body.theme-bright .bg-panel\/95 { background-color: rgba(255, 255, 255, 0.95) !important; }
         
-        /* Fix Calendar Icon colors based on Theme */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1); /* Makes arrow white in Dark Mode */
-            cursor: pointer;
-        }
-        body.theme-bright input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(0); /* Keeps arrow dark in Bright Mode */
-        }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        body.theme-bright input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0); }
 
-        /* HUD Metrics Persistent Orange Color (Always Orange in every mode) */
-        .hud-metric-text,
-        #hud-distance,
-        #hud-time,
-        #unit-toggle,
-        .hud-metric-panel,
-        .hud-metric-panel * { color: #f97316 !important; }
-        
-        body.theme-bright .hud-element { color: #f97316 !important; } /* Legacy fallback */
-        body.theme-bright #chat-request-banner { background-color: #fff7ed !important; color: #9a3412 !important; border-color: #fdba74 !important; }
+        .hud-metric-text, #hud-distance, #hud-time, #unit-toggle, .hud-metric-panel, .hud-metric-panel * { color: #f97316 !important; }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col items-center justify-center transition-colors duration-300">
 
-    <!-- Mobile App Container -->
     <div class="w-full h-full max-w-md bg-dark relative flex flex-col shadow-2xl overflow-hidden transition-colors duration-300">
         
         <header class="h-16 bg-panel flex items-center justify-between px-4 z-20 shadow-md border-b border-gray-800/50">
             <div class="flex items-center h-full">
-                <!-- Official Vector Logo (Unbreakable Inline SVG) -->
                 <svg viewBox="0 0 120 120" class="h-11 w-11 rounded-[10px] shadow-[0_0_15px_rgba(64,224,208,0.3)] transition-transform active:scale-95" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                         <radialGradient id="bgGrad" cx="50%" cy="30%" r="100%">
@@ -213,12 +191,10 @@
                         <h3 class="text-lg font-bold text-textmain mb-2">Start Now</h3>
                         <p class="text-sm text-gray-400 mb-3 relative z-10">Begin tracking time and distance. Conquer an area by returning within 40m of your starting point.</p>
                         
-                        <!-- Team Run Selector -->
                         <div class="relative z-10 mb-4">
                             <label class="text-[10px] text-gray-400 uppercase tracking-wider mb-1 block">Start with a Group</label>
                             <select id="go-group-select" class="w-full bg-dark text-textmain text-sm rounded-lg border border-gray-700 p-2 focus:outline-none focus:border-turq shadow-inner">
                                 <option value="none">Just Me (Solo Run)</option>
-                                <!-- Groups dynamically injected here -->
                             </select>
                         </div>
 
@@ -256,7 +232,6 @@
                         </div>
 
                         <div class="w-full h-56 rounded-xl border border-gray-700/50 relative overflow-hidden bg-[#1a1a1a]">
-                            <!-- Cartesian Grid Background -->
                             <div class="absolute inset-0 opacity-20 pointer-events-none" style="background-size: 20px 20px; background-image: linear-gradient(to right, #4b5563 1px, transparent 1px), linear-gradient(to bottom, #4b5563 1px, transparent 1px);"></div>
                             <div class="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
                                 <div class="w-full h-[1px] bg-turq"></div>
@@ -280,9 +255,7 @@
 
                     <div class="bg-panel p-4 rounded-2xl border border-gray-700/50 shadow-md">
                         <h3 class="text-lg font-bold text-textmain mb-3"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Previous Records</h3>
-                        <div id="history-list" class="space-y-2">
-                            <!-- History items -->
-                        </div>
+                        <div id="history-list" class="space-y-2"></div>
                     </div>
                 </div>
             </div>
@@ -306,7 +279,6 @@
                             <div class="text-xl font-bold text-turq mt-1" id="dash-score">0</div>
                         </div>
                         
-                        <!-- New Group Stats Box -->
                         <div class="bg-panel p-4 rounded-2xl border border-gray-700/50 shadow-md col-span-2">
                             <div class="flex justify-between items-center mb-1">
                                 <div class="text-xs text-gray-400">Group Score <i class="fa-solid fa-users ml-1"></i></div>
@@ -412,18 +384,14 @@
                         </select>
                     </div>
                     
-                    <!-- Appears only when Team Runs is selected -->
                     <div id="lb-group-container" class="hidden">
                         <select id="lb-group-select" class="w-full bg-dark text-turq text-sm rounded-lg border border-gray-700 p-2 focus:outline-none focus:border-turq shadow-inner">
                             <option value="all">All Groups (Total Team Score)</option>
-                            <!-- Groups injected via JS -->
                         </select>
                     </div>
 
                     <div class="bg-panel rounded-2xl border border-gray-700/50 shadow-md overflow-hidden mt-2">
-                        <div id="leaderboard-list" class="divide-y divide-gray-800/50">
-                            <!-- Items go here -->
-                        </div>
+                        <div id="leaderboard-list" class="divide-y divide-gray-800/50"></div>
                     </div>
                 </div>
             </div>
@@ -436,50 +404,38 @@
                         <button id="btn-back-inbox" class="text-gray-400 p-2 hover:text-turq"><i class="fa-solid fa-arrow-left"></i></button>
                     </div>
                     
-                    <!-- Social Hub Tabs -->
                     <div class="flex bg-panel rounded-lg p-1 border border-gray-700/50 shadow-md mb-4 relative z-10">
                         <button class="social-tab-btn flex-1 py-1.5 text-sm font-bold rounded-md bg-turq text-dark shadow-sm transition-colors" data-target="soc-network">Network</button>
                         <button class="social-tab-btn flex-1 py-1.5 text-sm font-bold rounded-md text-gray-400 hover:text-white transition-colors" data-target="soc-chats">Chats</button>
                         <button class="social-tab-btn flex-1 py-1.5 text-sm font-bold rounded-md text-gray-400 hover:text-white transition-colors" data-target="soc-groups">Groups</button>
                     </div>
 
-                    <!-- Tab 1: Network & Stories -->
                     <div id="soc-network" class="social-tab-content space-y-5">
-                        
-                        <!-- Stories Bar -->
                         <div>
                             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Stories (24h)</h3>
                             <div class="flex overflow-x-auto hide-scroll gap-4 pb-2" id="stories-container">
-                                <!-- Add My Story -->
                                 <div class="snap-start flex flex-col items-center gap-1 cursor-pointer" onclick="showAlert('Add Story', 'Select a recent conquest to share on your story!')">
                                     <div class="w-16 h-16 rounded-full border-2 border-dashed border-gray-500 p-0.5 active:scale-95 transition-transform flex items-center justify-center bg-gray-800">
                                         <i class="fa-solid fa-plus text-gray-400 text-xl"></i>
                                     </div>
                                     <span class="text-[10px] text-gray-400 font-medium">Add</span>
                                 </div>
-                                <!-- Mock Stories Injected via JS -->
                             </div>
                         </div>
 
-                        <!-- Search Fellows -->
                         <div class="relative">
                             <input type="text" placeholder="Search for fellows..." class="w-full bg-panel text-textmain rounded-xl pl-10 pr-4 py-3 border border-gray-700 focus:outline-none focus:border-turq shadow-sm">
                             <i class="fa-solid fa-search absolute left-4 top-3.5 text-gray-500"></i>
                         </div>
 
-                        <!-- Connection Suggestions -->
                         <div>
                             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-yellow-400"></i> Suggested Connections</h3>
-                            <div class="grid grid-cols-2 gap-3" id="suggestions-container">
-                                <!-- Injected via JS -->
-                            </div>
+                            <div class="grid grid-cols-2 gap-3" id="suggestions-container"></div>
                         </div>
 
-                        <!-- My Connections List -->
                         <div>
                             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-user-group mr-1"></i> My Connections</h3>
                             <div class="space-y-2" id="connections-list">
-                                <!-- Static Mock Connection -->
                                 <div class="bg-panel p-3 rounded-xl border border-gray-800 flex justify-between items-center shadow-sm">
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-full bg-turq/20 text-turq flex items-center justify-center border border-turq/50"><i class="fa-solid fa-user"></i></div>
@@ -494,15 +450,11 @@
                         </div>
                     </div>
 
-                    <!-- Tab 2: Private Chats -->
                     <div id="soc-chats" class="social-tab-content hidden space-y-2">
                         <div class="text-xs text-gray-400 px-1 mb-2">Direct Messages</div>
-                        <div id="inbox-list" class="space-y-2">
-                            <!-- Threads go here -->
-                        </div>
+                        <div id="inbox-list" class="space-y-2"></div>
                     </div>
 
-                    <!-- Tab 3: Groups & Teams -->
                     <div id="soc-groups" class="social-tab-content hidden space-y-4">
                         <div class="bg-turq/10 border border-turq/30 p-4 rounded-xl shadow-inner text-center">
                             <i class="fa-solid fa-people-group text-3xl text-turq mb-2"></i>
@@ -513,12 +465,9 @@
 
                         <div>
                             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">My Groups</h3>
-                            <div id="groups-list" class="space-y-3">
-                                <!-- Injected via JS -->
-                            </div>
+                            <div id="groups-list" class="space-y-3"></div>
                         </div>
                     </div>
-
                 </div>
             </div>
 
@@ -545,9 +494,7 @@
                     </div>
                 </div>
 
-                <div id="chat-messages" class="flex-1 p-4 space-y-3 overflow-y-auto hide-scroll flex flex-col mb-28">
-                    <!-- Messages go here -->
-                </div>
+                <div id="chat-messages" class="flex-1 p-4 space-y-3 overflow-y-auto hide-scroll flex flex-col mb-28"></div>
                 
                 <div id="chat-input-area" class="p-2 bg-panel/95 backdrop-blur-xl border border-gray-700/80 flex items-center gap-2 shrink-0 absolute bottom-28 left-4 right-4 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.7)] z-20">
                     <input type="text" id="chat-input" class="flex-1 bg-dark text-textmain rounded-full px-4 py-2 border border-gray-700 focus:outline-none focus:border-turq" placeholder="Message...">
@@ -584,18 +531,13 @@
 
     </div>
 
-    <!-- UI Modals -->
-
-    <!-- Story Viewer Fullscreen Modal -->
+    <!-- Modals -->
     <div id="modal-story" class="fixed inset-0 z-50 bg-black hidden flex-col transition-opacity duration-300 opacity-0 max-w-md mx-auto h-full w-full">
-        <!-- Progress Bar -->
         <div class="absolute top-4 left-4 right-4 flex gap-1 z-20">
             <div class="h-1 bg-white/30 rounded-full flex-1 overflow-hidden">
                 <div class="h-full bg-white w-0 story-progress"></div>
             </div>
         </div>
-        
-        <!-- Header -->
         <div class="absolute top-8 left-4 right-4 flex justify-between items-center z-20">
             <div class="flex items-center gap-2">
                 <div class="w-10 h-10 rounded-full bg-turq flex items-center justify-center text-dark font-bold border-2 border-white"><i class="fa-solid fa-user"></i></div>
@@ -606,22 +548,17 @@
             </div>
             <button class="text-white text-3xl drop-shadow-md hover:text-gray-300 w-10 h-10 flex justify-end" onclick="closeStory()">&times;</button>
         </div>
-        
-        <!-- Content Background -->
         <div class="flex-1 flex flex-col items-center justify-center p-6 relative bg-gradient-to-b from-gray-900 to-dark">
             <div class="absolute inset-0 opacity-20 pointer-events-none" style="background-size: 20px 20px; background-image: linear-gradient(to right, #4b5563 1px, transparent 1px), linear-gradient(to bottom, #4b5563 1px, transparent 1px);"></div>
             <i class="fa-solid fa-map-location-dot text-7xl text-turq/20 mb-6 drop-shadow-lg"></i>
             <div id="story-headline" class="text-3xl font-black text-white text-center tracking-wide leading-tight drop-shadow-lg z-10 px-4">Headline</div>
         </div>
-        
-        <!-- Footer (Reply) -->
         <div class="absolute bottom-8 left-4 right-4 flex gap-2 z-20">
             <input type="text" placeholder="Reply to story..." class="flex-1 bg-black/60 text-white border border-white/30 rounded-full px-5 py-3 text-sm backdrop-blur-xl focus:outline-none focus:border-turq">
             <button class="w-12 h-12 bg-turq rounded-full text-dark flex items-center justify-center shadow-lg active:scale-95 transition-transform" onclick="closeStory(); showAlert('Sent', 'Reply sent!')"><i class="fa-solid fa-paper-plane"></i></button>
         </div>
     </div>
     
-    <!-- Custom Alert Modal -->
     <div id="modal-alert" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden backdrop-blur-sm">
         <div class="bg-panel rounded-2xl p-6 w-10/12 max-w-sm border border-gray-700/50 shadow-2xl transform transition-transform scale-95 text-center">
             <i class="fa-solid fa-triangle-exclamation text-4xl text-orange-500 mb-4"></i>
@@ -631,7 +568,6 @@
         </div>
     </div>
 
-    <!-- End Session Modal -->
     <div id="modal-end-session" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 hidden backdrop-blur-sm">
         <div class="bg-panel rounded-2xl p-6 w-10/12 max-w-sm border border-gray-700/50 shadow-2xl transform transition-transform scale-95 text-center">
             <i class="fa-solid fa-circle-stop text-4xl text-red-500 mb-4"></i>
@@ -644,7 +580,6 @@
         </div>
     </div>
 
-    <!-- Huway Success Modal -->
     <div id="modal-conquest" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-md">
         <div class="bg-panel rounded-2xl p-1 border border-turq shadow-[0_0_30px_rgba(64,224,208,0.3)] w-11/12 max-w-sm transform transition-transform scale-95 text-center flex flex-col max-h-[90vh]">
             <div class="bg-dark rounded-xl p-6 overflow-y-auto hide-scroll">
@@ -687,7 +622,6 @@
         </div>
     </div>
 
-    <!-- User Profile Modal (Viewing Others) -->
     <div id="modal-user-profile" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-sm p-4">
         <div class="bg-panel rounded-2xl w-full max-w-sm border border-gray-700/50 shadow-2xl flex flex-col overflow-hidden transform transition-transform scale-95">
             <div class="p-6">
@@ -723,7 +657,6 @@
         </div>
     </div>
 
-    <!-- Settings & Theme Modal -->
     <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-sm p-4">
         <div class="bg-panel rounded-2xl w-full max-w-sm border border-gray-700/50 shadow-2xl flex flex-col max-h-[90vh] transform transition-transform scale-95">
             <div class="p-4 border-b border-gray-800 flex justify-between items-center shrink-0">
@@ -732,8 +665,6 @@
             </div>
             
             <div class="p-4 overflow-y-auto hide-scroll space-y-6">
-                
-                <!-- Personal Info -->
                 <div>
                     <h3 class="text-xs text-turq uppercase tracking-wider mb-3"><i class="fa-solid fa-user-pen mr-2"></i>Personal Info</h3>
                     <div class="space-y-3">
@@ -773,7 +704,6 @@
                     </div>
                 </div>
 
-                <!-- Account Linking -->
                 <div class="pt-4 border-t border-gray-800/50">
                     <h3 class="text-xs text-turq uppercase tracking-wider mb-3"><i class="fa-solid fa-shield-halved mr-2"></i>Account & Security</h3>
                     <div class="flex gap-2">
@@ -782,7 +712,6 @@
                     </div>
                 </div>
 
-                <!-- Theme Settings -->
                 <div class="pt-4 border-t border-gray-800/50">
                     <h3 class="text-xs text-turq uppercase tracking-wider mb-3"><i class="fa-solid fa-palette mr-2"></i>App Theme</h3>
                     <div class="flex gap-2">
@@ -815,14 +744,12 @@
         </div>
     </div>
 
-    <!-- Date Filter Modal (For Paths) -->
     <div id="modal-date-filter" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-sm p-4">
         <div class="bg-panel rounded-2xl w-full max-w-sm border border-gray-700/50 shadow-2xl p-6 transform transition-transform scale-95">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-textmain"><i class="fa-solid fa-calendar-days mr-2"></i>Filter Paths</h2>
                 <button class="btn-close-modal text-gray-400 hover:text-turq text-2xl leading-none transition-colors">&times;</button>
             </div>
-            
             <div class="space-y-4">
                 <div>
                     <label class="text-xs text-gray-400 mb-1 block">Start Date</label>
@@ -840,16 +767,12 @@
         </div>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Engine -->
     <script type="module">
-        // Use exact standard Firebase 10.12.2 CDN versions to prevent 404 module crash
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        // ==========================================
-        // 1. STATE VARIABLES
-        // ==========================================
         const appId = 'huway-app-123';
         
         let app, db, auth, userId = null;
@@ -868,18 +791,13 @@
         let mediaRecorder = null;
         let audioChunks = [];
 
-        // LOAD FROM LOCAL STORAGE IMMEDIATELY
         const localHist = localStorage.getItem('huway_history');
         if (localHist) userHistory = JSON.parse(localHist);
 
         const localProf = localStorage.getItem('huway_profile');
         if (localProf) userProfile = { ...userProfile, ...JSON.parse(localProf) };
 
-        // ==========================================
-        // 2. INITIALIZATION SEQUENCE
-        // ==========================================
         function initApp() {
-            // Guarantee map & UI loads regardless of cloud status
             initMap();
             initMiniMap();
             populateSocialMocks();
@@ -887,27 +805,21 @@
             updateHistoryUI();
             updateAnalyticsUI();
             renderHistoryOnMap();
-            
-            // Try connecting to Firebase safely
             attemptFirebaseConnection();
         }
 
         function attemptFirebaseConnection() {
             const authStatus = document.getElementById('auth-status');
             try {
-                // Use a safe fallback config if __firebase_config is missing so initializeApp doesn't crash
                 const safeConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "mock", appId: "mock", projectId: "mock-project" };
-                
                 app = initializeApp(safeConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                
                 signInAnonymously(auth).then(cred => {
                     userId = cred.user.uid;
                     authStatus.innerHTML = `<i class="fa-solid fa-circle-check text-green-500"></i> Online`;
                     startDataSync();
                 }).catch(e => setLocalMode(authStatus));
-                
             } catch (e) {
                 setLocalMode(authStatus);
             }
@@ -915,7 +827,6 @@
 
         function setLocalMode(statusElement) {
             statusElement.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i> Local Mode`;
-            console.warn("Running in local device memory mode. Cloud sync disabled.");
         }
 
         function startDataSync() {
@@ -930,7 +841,7 @@
                 if(snap.exists()) userProfile = { ...userProfile, ...snap.data() };
                 else detectLocation();
                 updateProfileUI();
-            });
+            }).catch(()=>{});
 
             onSnapshot(publicUsersRef, snap => {
                 publicUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -938,18 +849,18 @@
                 if(currentTab === 'view-profile') updateProfileRankDisplay();
                 updateInboxBadge();
                 if(currentTab === 'view-messages') renderInbox();
-            });
+            }, ()=>{});
 
             onSnapshot(messagesRef, snap => {
                 chats = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 updateInboxBadge();
                 if(currentTab === 'view-messages') renderInbox();
                 if(currentChatId) renderMessages();
-            });
+            }, ()=>{});
 
             onSnapshot(publicRef, snap => {
                 publicConquests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            });
+            }, ()=>{});
 
             onSnapshot(privateRef, snap => {
                 userHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -957,17 +868,14 @@
                 if(currentTab === 'view-go') updateHistoryUI();
                 renderHistoryOnMap();
                 if(miniMap) renderMiniMap();
-            });
+            }, ()=>{});
         }
 
-        // ==========================================
-        // 3. MAP CONFIGURATION
-        // ==========================================
         const THEME = { walkrun: { hex: '#22c55e' }, cycle: { hex: '#f97316' }, bike: { hex: '#ef4444' } };
 
         let map, userMarker, pathPolyline, guidePolyline;
         let conquestLayerGroup, pathsLayerGroup;
-        let miniMap, miniConquestLayer;
+        let miniMap;
         let currentCategory = 'walkrun';
         let distanceUnit = 'km'; 
         
@@ -1007,14 +915,13 @@
         let lineChartInstance = null;
         let barChartInstance = null;
 
-        // UI Helpers
-        function showAlert(title, msg) {
+        window.showAlert = function(title, msg) {
             document.getElementById('alert-title').innerText = title;
             document.getElementById('alert-msg').innerText = msg;
             const modal = document.getElementById('modal-alert');
             modal.classList.remove('hidden');
             setTimeout(() => modal.firstElementChild.classList.remove('scale-95'), 10);
-        }
+        };
         document.getElementById('alert-btn').addEventListener('click', () => {
             const modal = document.getElementById('modal-alert');
             modal.firstElementChild.classList.add('scale-95');
@@ -1034,11 +941,8 @@
             return `${h}h ${m}m ${s}s`;
         }
 
-        // ==========================================
-        // 4. LEAFLET MAP LOGIC
-        // ==========================================
         function initMap() {
-            if (map) return; // Prevent double init
+            if (map) return;
             map = L.map('map', { zoomControl: false }).setView([31.5204, 74.3587], 13);
             
             L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -1072,7 +976,6 @@
 
         function renderHistoryOnMap() {
             if(!map) return;
-            
             conquestLayerGroup.clearLayers();
             if (showConquests) {
                 publicConquests.forEach(record => {
@@ -1141,9 +1044,6 @@
             }
         }
 
-        // ==========================================
-        // 5. CARTESIAN MATH MAP
-        // ==========================================
         function setupCartesianFilters() {
             const btnFilter = document.getElementById('btn-land-filter');
             const panel = document.getElementById('land-filter-panel');
@@ -1171,14 +1071,12 @@
 
             document.getElementById('land-start-date').addEventListener('change', renderCartesianLand);
             document.getElementById('land-end-date').addEventListener('change', renderCartesianLand);
-            
             window.addEventListener('resize', () => { if(currentTab === 'view-go') renderCartesianLand(); });
         }
 
         function renderCartesianLand() {
             const canvas = document.getElementById('cartesian-canvas');
             if (!canvas) return;
-            
             const rect = canvas.parentElement.getBoundingClientRect();
             if (rect.width === 0) return; 
             canvas.width = rect.width;
@@ -1188,7 +1086,6 @@
 
             const filterType = document.getElementById('land-quick-filter').value;
             let start = 0, end = Infinity;
-            
             const now = new Date();
             if (filterType === 'today') {
                 start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -1251,7 +1148,6 @@
                     if (i === 0) ctx.moveTo(canvasX, canvasY); else ctx.lineTo(canvasX, canvasY);
                 });
                 ctx.closePath();
-
                 const catTheme = THEME[poly.category] || { hex: '#40E0D0' };
                 ctx.fillStyle = catTheme.hex + '55'; 
                 ctx.fill();
@@ -1259,9 +1155,6 @@
             });
         }
 
-        // ==========================================
-        // 6. ACTIVITY TRACKING LOOP
-        // ==========================================
         function startAutoTracking() {
             if (!("geolocation" in navigator)) return showAlert("Error", "No GPS available.");
             if (watchId) navigator.geolocation.clearWatch(watchId);
@@ -1462,7 +1355,6 @@
             };
             
             lastConquestCoords = turfCoords; lastConquestCategory = currentCategory; lastConquestArea = area;
-            
             resetTrackingSession();
             
             userHistory.push(record);
@@ -1478,7 +1370,7 @@
             localStorage.setItem('huway_history', JSON.stringify(userHistory));
             localStorage.setItem('huway_profile', JSON.stringify(userProfile));
 
-            if (userId) {
+            if (userId && db) {
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'history'), record);
                     await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
@@ -1518,13 +1410,10 @@
             if (currentTab === 'view-go') updateHistoryUI();
             if (currentTab === 'view-leaderboard') updateLeaderboardUI();
             renderHistoryOnMap();
-            if (miniMap) renderMiniMap();
+            renderCartesianLand();
             updateProfileRankDisplay();
         });
 
-        // ==========================================
-        // 7. SHARE & UI CONTROLS
-        // ==========================================
         async function shareCanvasAsImage(canvasEl, shareText) {
             try {
                 if (!navigator.share) return showAlert("Not Supported", "Native sharing is not supported on this browser.");
@@ -1648,9 +1537,6 @@
             currentTab = tid; updateNav();
         }));
 
-        // ==========================================
-        // 8. STATS & AI COACH
-        // ==========================================
         document.querySelectorAll('.dash-cat-btn').forEach(btn => btn.addEventListener('click', (e) => {
             document.querySelectorAll('.dash-cat-btn').forEach(b => { b.classList.remove('bg-gray-800', `text-${b.dataset.cat}`); b.classList.add('text-gray-400'); });
             const t = e.currentTarget; dashCategory = t.dataset.cat;
@@ -1720,23 +1606,11 @@
 
         document.getElementById('btn-ai-insight').addEventListener('click', async () => {
             const btn = document.getElementById('btn-ai-insight'); const textEl = document.getElementById('ai-insight-text');
-            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Data...'; btn.classList.add('opacity-70');
-            textEl.innerHTML = '<span class="text-turq animate-pulse font-medium">Consulting the AI Coach...</span>';
-
-            const data = userHistory.filter(d => d.category === dashCategory);
-            let tArea=0, tScore=0, tDist=0, tDur=0;
-            data.forEach(d => { tArea+=d.area||0; tScore+=d.score||0; tDist+=d.distance||0; tDur+=d.duration||0; });
-            
-            const prompt = `Act as an expert fitness and urban exploration coach. Provide a highly motivating, 2-sentence summary of their progress. Then, provide ONE specific tip on capturing larger areas using loop routes. Emojis allowed. No markdown.`;
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=mock-key`;
-            
-            try {
-                // Mock API hit (User must provide valid key for actual use)
-                setTimeout(() => {
-                    textEl.innerHTML = `<span class="text-textmain">Incredible effort! You are mastering the map. To increase your coverage exponentially, try planning large circular routes instead of out-and-back paths! 🚀🗺️</span>`;
-                    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Insight'; btn.classList.remove('opacity-70');
-                }, 1500);
-            } catch (e) {}
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Data...';
+            setTimeout(() => {
+                textEl.innerHTML = `<span class="text-textmain">Incredible effort! You are mastering the map. To increase your coverage exponentially, try planning large circular routes instead of out-and-back paths! 🚀🗺️</span>`;
+                btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Insight';
+            }, 1500);
         });
 
         document.getElementById('btn-ai-quest')?.addEventListener('click', async () => {
@@ -1748,9 +1622,6 @@
             }, 1000);
         });
 
-        // ==========================================
-        // 9. PROFILE & RANKS
-        // ==========================================
         async function detectLocation() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(async pos => {
@@ -1771,7 +1642,7 @@
             userProfile.gender = document.getElementById('prof-gender').value; userProfile.isPublic = document.getElementById('prof-public').checked;
 
             localStorage.setItem('huway_profile', JSON.stringify(userProfile));
-            if(userId) {
+            if(userId && db) {
                 try {
                     await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
@@ -1821,6 +1692,7 @@
                         <div class="text-right">
                             <div class="text-sm font-bold text-turq">${i.score.toLocaleString()} <span class="text-[10px] text-gray-400">pts</span></div>
                             <div class="text-[10px] text-gray-400">${Math.floor(i.area).toLocaleString()} m² • ${formatDistance(i.distance)}${distanceUnit}</div>
+                        </div>
                     </div>`;
             });
         }
@@ -1968,7 +1840,7 @@
         document.getElementById('mu-rank-category').addEventListener('change', updateModalRankDisplay);
         document.getElementById('mu-rank-region').addEventListener('change', updateModalRankDisplay);
 
-        function openUserProfile(targetUid) {
+        window.openUserProfile = function(targetUid) {
             if (targetUid === userId || targetUid === 'local-user') return; 
             const u = publicUsers.find(x => x.id === targetUid);
             if (!u) return showAlert("Not Found", "User unavailable.");
@@ -1982,11 +1854,8 @@
                 openChat(u);
             };
             const m = document.getElementById('modal-user-profile'); m.classList.remove('hidden'); setTimeout(()=>m.firstElementChild.classList.remove('scale-95'),10);
-        }
+        };
 
-        // ==========================================
-        // 10. SOCIAL HUB & MESSAGING
-        // ==========================================
         document.getElementById('btn-inbox').addEventListener('click', () => { document.querySelector('.nav-btn').click(); currentTab='view-messages'; updateNav(); });
         document.getElementById('btn-back-inbox').addEventListener('click', () => { document.querySelector('.nav-btn[data-target="view-map"]').click(); });
         document.getElementById('btn-back-chat').addEventListener('click', () => { currentTab='view-messages'; updateNav(); renderInbox(); });
@@ -2072,7 +1941,6 @@
             c.scrollTop = c.scrollHeight;
         }
 
-        // --- NEW CHAT DELIVERY FUNCTION ---
         async function deliverMessage(text, audioUrl) {
             if(!currentChatUser) return;
             const fakeId = userId || 'local-user';
@@ -2085,12 +1953,8 @@
                 timestamp: Date.now(),
                 status: 'pending'
             };
-            
-            // Add instantly to local UI
             chats.push(msg);
             renderMessages();
-            
-            // Attempt to sync to cloud if connected
             if(userId && db) {
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), msg);
@@ -2110,7 +1974,7 @@
         document.getElementById('btn-accept-request').addEventListener('click', async () => {
             const t = chats.filter(m => m.receiverId===userId && m.senderId===currentChatUser.id && m.status==='pending');
             for(let m of t) {
-                m.status = 'accepted'; // Local instant fix
+                m.status = 'accepted';
                 if(db) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', m.id), { status: 'accepted' });
             }
             renderMessages();
@@ -2166,7 +2030,6 @@
         });
 
         function populateSocialMocks() {
-            // Stories
             const storiesHtml = [
                 { name: 'Alex', time: '1h ago', img: 'bg-blue-500', icon: 'fa-person-biking', msg: 'Conquered 800m² on the morning ride! 🚴' },
                 { name: 'Sarah', time: '3h ago', img: 'bg-purple-500', icon: 'fa-person-running', msg: 'New personal best distance today! 🏃‍♀️' },
@@ -2182,7 +2045,6 @@
             const storiesContainer = document.getElementById('stories-container');
             if(storiesContainer) storiesContainer.innerHTML += storiesHtml;
 
-            // Suggestions
             const suggestionsHtml = [
                 { name: 'Elena R.', match: '90% Match', int: 'Cyclist in Lahore' },
                 { name: 'David K.', match: '85% Match', int: 'Runner nearby' }
@@ -2198,7 +2060,6 @@
             const suggContainer = document.getElementById('suggestions-container');
             if(suggContainer) suggContainer.innerHTML = suggestionsHtml;
 
-            // Groups
             const groupsMockData = [
                 { name: 'Lahore Night Riders', members: 12, type: 'bike', active: true },
                 { name: 'Downtown Run Club', members: 45, type: 'walkrun', active: false },
@@ -2221,7 +2082,6 @@
             const groupsContainer = document.getElementById('groups-list');
             if(groupsContainer) groupsContainer.innerHTML = groupsHtml;
 
-            // Populate GO Dashboard Team Selector
             const goGroupSelect = document.getElementById('go-group-select');
             if (goGroupSelect) {
                 goGroupSelect.innerHTML = '<option value="none">Just Me (Solo Run)</option>' +
@@ -2255,10 +2115,7 @@
             setTimeout(() => m.classList.add('hidden'), 300);
         };
 
-        // --- MASTER STARTUP COMMAND ---
-        // Calling initApp() immediately so that the UI never waits or freezes.
         initApp();
-
     </script>
 </body>
 </html>
