@@ -148,7 +148,7 @@
             <div class="flex items-center gap-4">
                 <button id="btn-inbox" class="text-gray-400 hover:text-turq relative transition-colors"><i class="fa-solid fa-envelope text-xl"></i><span id="unread-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-[10px] w-3 h-3 rounded-full border border-dark"></span></button>
                 <div id="auth-status" class="text-xs text-gray-400 flex items-center">
-                    <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Connecting...
+                    <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Booting...
                 </div>
             </div>
         </header>
@@ -840,113 +840,95 @@
         </div>
     </div>
 
-    <!-- Firebase Logic -->
+    <!-- JavaScript Logic -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Use exact standard Firebase 10.12.2 CDN versions to prevent 404 module crash
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         // ==========================================
-        // 1. FIREBASE SETUP & STATE
+        // 1. STATE VARIABLES
         // ==========================================
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'huway-app-123';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { projectId: "mock-project" };
-        const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        const appId = 'huway-app-123';
+        
         let app, db, auth, userId = null;
         let publicConquests = []; 
         let userHistory = [];
         let userProfile = { 
-            name: '', 
-            bio: '', 
-            dob: '',
-            gender: '',
-            isPublic: false, 
-            location: { city: 'Lahore', state: 'Punjab', country: 'Pakistan' }, 
+            name: 'Shah Nawaz Khan', bio: '', dob: '', gender: '',
+            isPublic: false, location: { city: 'Lahore', state: 'Punjab', country: 'Pakistan' }, 
             stats: { walkrun: 0, cycle: 0, bike: 0, team: 0 }, 
-            groupStats: {},
-            blocked: [] 
+            groupStats: {}, blocked: [] 
         };
         let publicUsers = [];
-
-        // LOAD FROM LOCAL STORAGE IMMEDIATELY ON BOOT
-        const localHist = localStorage.getItem('huway_history');
-        if (localHist) userHistory = JSON.parse(localHist);
-
-        const localProf = localStorage.getItem('huway_profile');
-        if (localProf) userProfile = { ...userProfile, ...JSON.parse(localProf) }; // Merge to ensure new keys exist
-
-        // Messaging
         let chats = [];
         let currentChatId = null;
         let currentChatUser = null;
         let mediaRecorder = null;
         let audioChunks = [];
 
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            const authStatus = document.getElementById('auth-status');
+        // LOAD FROM LOCAL STORAGE IMMEDIATELY
+        const localHist = localStorage.getItem('huway_history');
+        if (localHist) userHistory = JSON.parse(localHist);
 
-            if (initialToken) {
-                signInWithCustomToken(auth, initialToken)
-                    .then(cred => handleAuthSuccess(cred.user))
-                    .catch(err => fallbackAuth(err));
-            } else {
-                fallbackAuth(new Error("No custom token"));
-            }
-            
-            function fallbackAuth(err) {
-                signInAnonymously(auth)
-                    .then(cred => handleAuthSuccess(cred.user))
-                    .catch(e => { 
-                        // FALLBACK FOR GITHUB DEPLOYMENT (NO CLOUD CONNECTION)
-                        authStatus.innerHTML = `<i class="fa-solid fa-circle-xmark text-red-500"></i> Offline`; 
-                        
-                        // Force UI Initialization from Local Storage
-                        updateProfileUI();
-                        updateHistoryUI();
-                        updateAnalyticsUI();
-                        renderHistoryOnMap();
-                        if(miniMap) renderMiniMap();
-                    });
-            }
+        const localProf = localStorage.getItem('huway_profile');
+        if (localProf) userProfile = { ...userProfile, ...JSON.parse(localProf) };
 
-            function handleAuthSuccess(user) {
-                userId = user.uid;
-                authStatus.innerHTML = `<i class="fa-solid fa-circle-check text-green-500"></i> Online`;
-                startDataSync();
-            }
-        } catch (e) {
-            // FALLBACK FOR GITHUB DEPLOYMENT (INIT FAILED)
-            document.getElementById('auth-status').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i> Local`;
-            
-            // Force UI Initialization from Local Storage
+        // ==========================================
+        // 2. INITIALIZATION SEQUENCE
+        // ==========================================
+        function initApp() {
+            // Guarantee map & UI loads regardless of cloud status
+            initMap();
+            initMiniMap();
+            populateSocialMocks();
             updateProfileUI();
             updateHistoryUI();
             updateAnalyticsUI();
             renderHistoryOnMap();
-            if(miniMap) renderMiniMap();
+            
+            // Try connecting to Firebase safely
+            attemptFirebaseConnection();
+        }
+
+        function attemptFirebaseConnection() {
+            const authStatus = document.getElementById('auth-status');
+            try {
+                // Use a safe fallback config if __firebase_config is missing so initializeApp doesn't crash
+                const safeConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "mock", appId: "mock", projectId: "mock-project" };
+                
+                app = initializeApp(safeConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                signInAnonymously(auth).then(cred => {
+                    userId = cred.user.uid;
+                    authStatus.innerHTML = `<i class="fa-solid fa-circle-check text-green-500"></i> Online`;
+                    startDataSync();
+                }).catch(e => setLocalMode(authStatus));
+                
+            } catch (e) {
+                setLocalMode(authStatus);
+            }
+        }
+
+        function setLocalMode(statusElement) {
+            statusElement.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i> Local Mode`;
+            console.warn("Running in local device memory mode. Cloud sync disabled.");
         }
 
         function startDataSync() {
             if (!userId) return;
-
             const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'conquests');
             const privateRef = collection(db, 'artifacts', appId, 'users', userId, 'history');
             const profileRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data');
             const publicUsersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
             const messagesRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
 
-            // Profile
             getDoc(profileRef).then(snap => {
-                if(snap.exists()) {
-                    userProfile = { ...userProfile, ...snap.data() };
-                } else {
-                    userProfile.name = "Shah Nawaz Khan"; 
-                    detectLocation();
-                }
+                if(snap.exists()) userProfile = { ...userProfile, ...snap.data() };
+                else detectLocation();
                 updateProfileUI();
             });
 
@@ -979,13 +961,9 @@
         }
 
         // ==========================================
-        // 2. CONFIGURATION & STATE
+        // 3. MAP CONFIGURATION
         // ==========================================
-        const THEME = {
-            walkrun: { hex: '#22c55e' }, // Green
-            cycle: { hex: '#f97316' },   // Orange
-            bike: { hex: '#ef4444' }     // Red
-        };
+        const THEME = { walkrun: { hex: '#22c55e' }, cycle: { hex: '#f97316' }, bike: { hex: '#ef4444' } };
 
         let map, userMarker, pathPolyline, guidePolyline;
         let conquestLayerGroup, pathsLayerGroup;
@@ -1012,8 +990,8 @@
         let pathsFilterEnd = null;
         
         let isTracking = false;
-        let currentTeamMembers = 1; // Tracks how many people are in the current run
-        let currentGroupName = 'none'; // Tracks which team you ran with
+        let currentTeamMembers = 1; 
+        let currentGroupName = 'none'; 
         
         let leftStartArea = false; 
         const START_RADIUS_METERS = 40;
@@ -1029,9 +1007,7 @@
         let lineChartInstance = null;
         let barChartInstance = null;
 
-        // ==========================================
-        // 3. UI HELPERS
-        // ==========================================
+        // UI Helpers
         function showAlert(title, msg) {
             document.getElementById('alert-title').innerText = title;
             document.getElementById('alert-msg').innerText = msg;
@@ -1059,9 +1035,10 @@
         }
 
         // ==========================================
-        // 4. MAP & GEOLOCATION
+        // 4. LEAFLET MAP LOGIC
         // ==========================================
         function initMap() {
+            if (map) return; // Prevent double init
             map = L.map('map', { zoomControl: false }).setView([31.5204, 74.3587], 13);
             
             L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -1073,11 +1050,7 @@
             conquestLayerGroup = L.layerGroup().addTo(map);
             pathsLayerGroup = L.layerGroup().addTo(map);
 
-            userMarker = L.marker([0, 0], { 
-                icon: getMarkerIcon(currentCategory), 
-                zIndexOffset: 1000 
-            }).addTo(map);
-            
+            userMarker = L.marker([0, 0], { icon: getMarkerIcon(currentCategory), zIndexOffset: 1000 }).addTo(map);
             pathPolyline = L.polyline([], { color: THEME[currentCategory].hex, weight: 5, opacity: 1.0, lineCap: 'round' }).addTo(map);
             guidePolyline = L.polyline([], { color: '#40E0D0', weight: 4, opacity: 0.8, dashArray: '10, 10', lineCap: 'round' }).addTo(map);
 
@@ -1085,7 +1058,7 @@
         }
         
         function initMiniMap() {
-            miniMap = { invalidateSize: () => {} }; // Mock object to satisfy existing hooks
+            miniMap = { invalidateSize: () => {} }; 
             setupCartesianFilters();
         }
 
@@ -1106,8 +1079,7 @@
                     if(!record.coords || record.coords.length < 3 || record.userId === userId) return;
                     const latLngs = record.coords.map(c => [c[1], c[0]]);
                     const poly = L.polygon(latLngs, {
-                        color: THEME[record.category]?.hex || '#888',
-                        fillColor: THEME[record.category]?.hex || '#888',
+                        color: THEME[record.category]?.hex || '#888', fillColor: THEME[record.category]?.hex || '#888',
                         fillOpacity: 0.15, weight: 1, dashArray: '5,5'
                     });
                     poly.on('click', () => { if(record.userId !== userId) openUserProfile(record.userId); });
@@ -1117,72 +1089,41 @@
                 let groups = [];
                 userHistory.forEach(record => {
                     if(!record.coords || record.coords.length < 4) return; 
-                    
-                    let matched = false;
-                    let partialOverlap = false;
-                    let poly1;
-                    
+                    let matched = false, partialOverlap = false, poly1;
                     try { poly1 = turf.polygon([record.coords]); } catch(e) { return; }
 
                     for (let g of groups) {
                         let poly2;
                         try { poly2 = turf.polygon([g.coords]); } catch(e) { continue; }
-                        
                         try {
                             let intersection = turf.intersect(poly1, poly2);
                             if (intersection) {
-                                let area1 = turf.area(poly1);
-                                let areaInt = turf.area(intersection);
-                                
-                                if (areaInt / area1 > 0.6) {
-                                    g.count++;
-                                    matched = true;
-                                    break;
-                                } else {
-                                    partialOverlap = true;
-                                    g.partialOverlap = true;
-                                }
+                                if (turf.area(intersection) / turf.area(poly1) > 0.6) { g.count++; matched = true; break; } 
+                                else { partialOverlap = true; g.partialOverlap = true; }
                             }
                         } catch(e) {
-                            if(turf.booleanOverlap(poly1, poly2)) {
-                                partialOverlap = true;
-                                g.partialOverlap = true;
-                            }
+                            if(turf.booleanOverlap(poly1, poly2)) { partialOverlap = true; g.partialOverlap = true; }
                         }
                     }
-                    if (!matched) {
-                        groups.push({ ...record, count: 1, partialOverlap: partialOverlap });
-                    }
+                    if (!matched) groups.push({ ...record, count: 1, partialOverlap: partialOverlap });
                 });
 
                 groups.forEach(g => {
                     const latLngs = g.coords.map(c => [c[1], c[0]]);
-                    
                     const baseColor = THEME[g.category]?.hex || '#fff';
                     const fillColor = g.partialOverlap ? '#eab308' : baseColor; 
                     
-                    const poly = L.polygon(latLngs, {
-                        color: baseColor,
-                        fillColor: fillColor,
-                        fillOpacity: 0.4, weight: 2
-                    });
+                    const poly = L.polygon(latLngs, { color: baseColor, fillColor: fillColor, fillOpacity: 0.4, weight: 2 });
                     conquestLayerGroup.addLayer(poly);
 
                     try {
                         const turfPoly = turf.polygon([g.coords]);
                         const center = turf.centroid(turfPoly);
                         const c = [center.geometry.coordinates[1], center.geometry.coordinates[0]];
-                        
                         const labelHtml = g.count > 1 
                             ? `<div class="bg-dark text-turq font-black text-xs px-2 py-1 rounded-full border border-turq shadow-lg whitespace-nowrap" style="transform: translate(-50%, -50%);">${g.count}X</div>`
                             : `<i class="fa-solid fa-flag text-xl" style="color: ${fillColor}; filter: drop-shadow(0 0 5px rgba(0,0,0,0.8)); transform: translate(-50%, -100%); display: block;"></i>`;
-
-                        const flagIcon = L.divIcon({
-                            className: 'custom-flag-icon',
-                            html: labelHtml,
-                            iconSize: [0, 0], iconAnchor: [0, 0] 
-                        });
-                        conquestLayerGroup.addLayer(L.marker(c, { icon: flagIcon }));
+                        conquestLayerGroup.addLayer(L.marker(c, { icon: L.divIcon({ className: 'custom-flag-icon', html: labelHtml, iconSize: [0, 0], iconAnchor: [0, 0] }) }));
                     } catch(e) {}
                 });
             }
@@ -1195,24 +1136,19 @@
                     if (pathsFilterEnd && record.timestamp > pathsFilterEnd) return;
 
                     const latLngs = record.coords.map(c => [c[1], c[0]]);
-                    pathsLayerGroup.addLayer(L.polyline(latLngs, {
-                        color: THEME[record.category]?.hex || '#fff', weight: 3, opacity: 0.6, dashArray: '10, 10'
-                    }));
+                    pathsLayerGroup.addLayer(L.polyline(latLngs, { color: THEME[record.category]?.hex || '#fff', weight: 3, opacity: 0.6, dashArray: '10, 10' }));
                 });
             }
         }
 
-        function renderMiniMap() {
-            renderCartesianLand();
-        }
-
+        // ==========================================
+        // 5. CARTESIAN MATH MAP
+        // ==========================================
         function setupCartesianFilters() {
             const btnFilter = document.getElementById('btn-land-filter');
             const panel = document.getElementById('land-filter-panel');
             const quick = document.getElementById('land-quick-filter');
             const customDates = document.getElementById('land-custom-dates');
-            const startD = document.getElementById('land-start-date');
-            const endD = document.getElementById('land-end-date');
             const label = document.getElementById('land-filter-label');
 
             if(!btnFilter) return;
@@ -1233,22 +1169,18 @@
                 }
             });
 
-            startD.addEventListener('change', renderCartesianLand);
-            endD.addEventListener('change', renderCartesianLand);
+            document.getElementById('land-start-date').addEventListener('change', renderCartesianLand);
+            document.getElementById('land-end-date').addEventListener('change', renderCartesianLand);
             
-            // Resize canvas when window changes to keep scale perfect
-            window.addEventListener('resize', () => {
-                if(currentTab === 'view-go') renderCartesianLand();
-            });
+            window.addEventListener('resize', () => { if(currentTab === 'view-go') renderCartesianLand(); });
         }
 
         function renderCartesianLand() {
             const canvas = document.getElementById('cartesian-canvas');
             if (!canvas) return;
             
-            // Match internal resolution to CSS display size to avoid blur/distortion
             const rect = canvas.parentElement.getBoundingClientRect();
-            if (rect.width === 0) return; // Hidden
+            if (rect.width === 0) return; 
             canvas.width = rect.width;
             canvas.height = rect.height;
             const ctx = canvas.getContext('2d');
@@ -1269,7 +1201,6 @@
             }
 
             const filtered = userHistory.filter(h => h.timestamp >= start && h.timestamp <= end && h.coords && h.coords.length > 2);
-            
             let totalArea = 0;
             const emptyMsg = document.getElementById('cartesian-empty');
             
@@ -1280,93 +1211,60 @@
             }
             emptyMsg.classList.add('hidden');
 
-            // Collect all points to calculate global bounding box
-            let allPoints = [];
-            let polygons = [];
-            
+            let allPoints = [], polygons = [];
             filtered.forEach(record => {
                 totalArea += (record.area || 0);
                 let poly = [];
                 record.coords.forEach(coord => {
-                    const lon = coord[0], lat = coord[1]; // GeoJSON is [lon, lat]
-                    poly.push({lon, lat});
-                    allPoints.push({lon, lat});
+                    poly.push({lon: coord[0], lat: coord[1]});
+                    allPoints.push({lon: coord[0], lat: coord[1]});
                 });
                 polygons.push({ points: poly, category: record.category });
             });
 
             document.getElementById('land-total-area').innerText = Math.floor(totalArea).toLocaleString() + ' m²';
 
-            // Find global bounds
-            let minLon = Math.min(...allPoints.map(p => p.lon));
-            let maxLon = Math.max(...allPoints.map(p => p.lon));
-            let minLat = Math.min(...allPoints.map(p => p.lat));
-            let maxLat = Math.max(...allPoints.map(p => p.lat));
-
-            // Scale aspect ratio correctly (Longitude degrees get smaller towards poles)
+            let minLon = Math.min(...allPoints.map(p => p.lon)), maxLon = Math.max(...allPoints.map(p => p.lon));
+            let minLat = Math.min(...allPoints.map(p => p.lat)), maxLat = Math.max(...allPoints.map(p => p.lat));
             const cosLat = Math.cos((minLat + maxLat) / 2 * Math.PI / 180);
             
-            // Map GPS coords to local Cartesian XY
             polygons.forEach(poly => {
-                poly.local = poly.points.map(p => ({
-                    x: (p.lon - minLon) * cosLat,
-                    y: (p.lat - minLat)
-                }));
+                poly.local = poly.points.map(p => ({ x: (p.lon - minLon) * cosLat, y: (p.lat - minLat) }));
             });
 
             let localMaxX = (maxLon - minLon) * cosLat;
             let localMaxY = (maxLat - minLat);
+            if (localMaxX === 0) localMaxX = 0.0001; if (localMaxY === 0) localMaxY = 0.0001;
 
-            const padding = 30; // Margin around the canvas edge
+            const padding = 30;
             const drawWidth = canvas.width - padding * 2;
             const drawHeight = canvas.height - padding * 2;
-            
-            // Prevent division by zero for tiny shapes
-            if (localMaxX === 0) localMaxX = 0.0001;
-            if (localMaxY === 0) localMaxY = 0.0001;
-
-            // Calculate uniform scale
-            const scaleX = drawWidth / localMaxX;
-            const scaleY = drawHeight / localMaxY;
-            const scale = Math.min(scaleX, scaleY);
-
-            // Center drawing in the canvas
+            const scale = Math.min(drawWidth / localMaxX, drawHeight / localMaxY);
             const xOffset = padding + (drawWidth - (localMaxX * scale)) / 2;
             const yOffset = padding + (drawHeight - (localMaxY * scale)) / 2;
 
-            // Draw each polygon onto the canvas plane
             polygons.forEach(poly => {
                 ctx.beginPath();
                 poly.local.forEach((pt, i) => {
                     const canvasX = xOffset + pt.x * scale;
-                    // Y is inverted because Canvas Y-axis goes down, map Y-axis (lat) goes up
                     const canvasY = canvas.height - (yOffset + pt.y * scale); 
-                    if (i === 0) ctx.moveTo(canvasX, canvasY);
-                    else ctx.lineTo(canvasX, canvasY);
+                    if (i === 0) ctx.moveTo(canvasX, canvasY); else ctx.lineTo(canvasX, canvasY);
                 });
                 ctx.closePath();
 
                 const catTheme = THEME[poly.category] || { hex: '#40E0D0' };
-                
-                // Draw filled background with transparency
-                ctx.fillStyle = catTheme.hex + '55'; // 33% opacity hex
+                ctx.fillStyle = catTheme.hex + '55'; 
                 ctx.fill();
-                
-                // Draw glowing outline
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = catTheme.hex;
-                ctx.stroke();
+                ctx.lineWidth = 2; ctx.strokeStyle = catTheme.hex; ctx.stroke();
             });
         }
 
         // ==========================================
-        // 5. CORE LOOP LOGIC
+        // 6. ACTIVITY TRACKING LOOP
         // ==========================================
         function startAutoTracking() {
             if (!("geolocation" in navigator)) return showAlert("Error", "No GPS available.");
-
             if (watchId) navigator.geolocation.clearWatch(watchId);
-
             watchId = navigator.geolocation.watchPosition(
                 handlePositionUpdate, (err) => console.warn("GPS Error:", err.message),
                 { enableHighAccuracy: true, maximumAge: 2000 }
@@ -1376,6 +1274,8 @@
         const btnGoStart = document.getElementById('btn-go-start');
         const trackingHud = document.getElementById('tracking-hud');
         const distToStartEl = document.getElementById('distance-to-start');
+        const hudDist = document.getElementById('hud-distance');
+        const hudTime = document.getElementById('hud-time');
 
         btnGoStart.addEventListener('click', () => {
             if (!isTracking) {
@@ -1385,13 +1285,10 @@
                 if (currentGroupName !== 'none') {
                     btnGoStart.disabled = true;
                     btnGoStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Notifying Team...';
-                    
-                    // Simulate waiting for team members to accept the run request
                     setTimeout(() => {
                         btnGoStart.disabled = false;
-                        const joined = Math.floor(Math.random() * 4) + 2; // Randomly 2 to 5 members join
-                        currentTeamMembers = joined;
-                        showAlert("Team Ready!", `${joined} members from ${currentGroupName} have joined your session! Your base score will be multiplied by ${joined}.`);
+                        currentTeamMembers = Math.floor(Math.random() * 4) + 2; 
+                        showAlert("Team Ready!", `${currentTeamMembers} members from ${currentGroupName} have joined your session! Your base score will be multiplied by ${currentTeamMembers}.`);
                         startActualSession();
                     }, 1500);
                 } else {
@@ -1412,7 +1309,6 @@
             lastMovedTime = Date.now();
             
             startAutoTracking();
-            
             document.querySelector('.nav-btn[data-target="view-map"]').click();
             trackingHud.classList.remove('hidden');
             
@@ -1421,9 +1317,7 @@
             btnGoStart.classList.replace('text-dark', 'text-white');
             btnGoStart.classList.replace('border-turq', 'border-red-500');
             
-            if (userMarker.getLatLng() && userMarker.getLatLng().lat !== 0) {
-                map.setView(userMarker.getLatLng(), 16);
-            }
+            if (userMarker.getLatLng() && userMarker.getLatLng().lat !== 0) map.setView(userMarker.getLatLng(), 16);
             
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -1470,24 +1364,15 @@
             pathPolyline.setLatLngs([]); guidePolyline.setLatLngs([]);
             hudDist.innerText = "0.00"; hudTime.innerText = "0h 00m 00s";
         }
-        
-        const hudDist = document.getElementById('hud-distance');
-        const hudTime = document.getElementById('hud-time');
 
         async function fetchRouteToStart(current, start) {
             try {
                 let profile = currentCategory === 'walkrun' ? 'foot' : (currentCategory === 'cycle' || currentCategory === 'bike' ? 'bike' : 'driving');
                 const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${current[1]},${current[0]};${start[1]},${start[0]}?overview=full&geometries=geojson`);
                 const data = await res.json();
-                if (data.routes && data.routes[0]) {
-                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    guidePolyline.setLatLngs(coords);
-                } else {
-                    guidePolyline.setLatLngs([current, start]);
-                }
-            } catch (e) {
-                guidePolyline.setLatLngs([current, start]);
-            }
+                if (data.routes && data.routes[0]) guidePolyline.setLatLngs(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+                else guidePolyline.setLatLngs([current, start]);
+            } catch (e) { guidePolyline.setLatLngs([current, start]); }
         }
 
         function handlePositionUpdate(pos) {
@@ -1504,27 +1389,21 @@
                 map.setView(pt, 16);
                 if (!startTime) startTime = now;
                 sessionCoords.push(pt);
-                lastPos = pt;
-                lastPosTime = now;
+                lastPos = pt; lastPosTime = now;
                 return;
             }
 
             if (lastPos && lastPosTime) {
                 const dist = map.distance(lastPos, pt);
-                
                 if (dist > 2) {
                     const secs = (now - lastPosTime) / 1000;
-                    if ((dist/secs) > 0.2) { 
-                        movingTimeSeconds += secs;
-                        lastMovedTime = now;
-                    } else {
-                        stationaryTimeSeconds += secs;
-                    }
+                    if ((dist/secs) > 0.2) { movingTimeSeconds += secs; lastMovedTime = now; } 
+                    else { stationaryTimeSeconds += secs; }
+                    
                     totalDistanceMeters += dist;
                     sessionCoords.push(pt);
                     pathPolyline.setLatLngs(sessionCoords);
-                    lastPos = pt; 
-                    lastPosTime = now;
+                    lastPos = pt; lastPosTime = now;
                     
                     map.setView(pt, map.getZoom());
                     hudDist.innerText = formatDistance(totalDistanceMeters);
@@ -1534,31 +1413,22 @@
                         fetchRouteToStart(pt, sessionCoords[0]);
                     }
                 }
-            } else {
-                lastMovedTime = now;
-            }
+            } else lastMovedTime = now;
 
             if (sessionCoords.length > 5) {
                 const distFromStart = map.distance(sessionCoords[0], pt);
                 distToStartEl.innerText = `${Math.floor(distFromStart)} m away`;
 
-                if (!leftStartArea && distFromStart > START_RADIUS_METERS && totalDistanceMeters > MIN_REQUIRED_DISTANCE) {
-                    leftStartArea = true; 
-                }
+                if (!leftStartArea && distFromStart > START_RADIUS_METERS && totalDistanceMeters > MIN_REQUIRED_DISTANCE) leftStartArea = true; 
                 if (leftStartArea && distFromStart <= START_RADIUS_METERS) {
                     stopTrackingSession(true);
                     handleConquestComplete();
                 }
-            } else {
-                distToStartEl.innerText = `-- m away`;
-            }
+            } else distToStartEl.innerText = `-- m away`;
         }
 
         async function handleConquestComplete() {
-            if (totalDistanceMeters < MIN_REQUIRED_DISTANCE || !leftStartArea) {
-                resetTrackingSession();
-                return; 
-            }
+            if (totalDistanceMeters < MIN_REQUIRED_DISTANCE || !leftStartArea) { resetTrackingSession(); return; }
 
             const turfCoords = [...sessionCoords, sessionCoords[0]].map(c => [c[1], c[0]]); 
             let area = 0;
@@ -1582,65 +1452,49 @@
                 }
             } catch(e) { }
 
-            // Apply both Overlap Multiplier AND Team Members Multiplier!
             const finalScore = score * multiplier * currentTeamMembers;
             const dur = Math.floor((now - startTime) / 1000);
 
             const record = {
                 category: currentCategory, area: area, score: finalScore, distance: totalDistanceMeters,
                 duration: dur, movingTime: Math.floor(movingTimeSeconds), stationaryTime: Math.floor(stationaryTimeSeconds),
-                timestamp: now, coords: turfCoords,
-                groupName: currentGroupName // Track which group we ran with
+                timestamp: now, coords: turfCoords, groupName: currentGroupName
             };
-
-            const dispArea = area, dispDist = totalDistanceMeters;
             
-            // Save state for sharing
-            lastConquestCoords = turfCoords;
-            lastConquestCategory = currentCategory;
-            lastConquestArea = area;
+            lastConquestCoords = turfCoords; lastConquestCategory = currentCategory; lastConquestArea = area;
             
             resetTrackingSession();
             
-            // 1. Instantly save to local memory arrays
             userHistory.push(record);
-            
             if (!userProfile.stats) userProfile.stats = { walkrun: 0, cycle: 0, bike: 0, team: 0 };
             userProfile.stats[currentCategory] = (userProfile.stats[currentCategory] || 0) + finalScore;
             
-            // Update Team Score Stats!
             if (currentTeamMembers > 1) {
                 userProfile.stats.team = (userProfile.stats.team || 0) + finalScore;
                 if (!userProfile.groupStats) userProfile.groupStats = {};
-                if (currentGroupName !== 'none') {
-                    userProfile.groupStats[currentGroupName] = (userProfile.groupStats[currentGroupName] || 0) + finalScore;
-                }
+                if (currentGroupName !== 'none') userProfile.groupStats[currentGroupName] = (userProfile.groupStats[currentGroupName] || 0) + finalScore;
             }
 
-            // 2. FORCE SAVE TO LOCAL STORAGE ON DEVICE (CRITICAL FIX FOR GITHUB HOSTING)
             localStorage.setItem('huway_history', JSON.stringify(userHistory));
             localStorage.setItem('huway_profile', JSON.stringify(userProfile));
 
-            // 3. Optional Backend Sync (Will fail silently but gracefully if offline)
             if (userId) {
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'history'), record);
                     await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'conquests'), {
-                        userId: userId, timestamp: now, coords: turfCoords, category: currentCategory
-                    });
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'conquests'), { userId: userId, timestamp: now, coords: turfCoords, category: currentCategory });
                     if (userProfile.isPublic) {
                         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
                             name: userProfile.name, bio: userProfile.bio, location: userProfile.location, 
                             stats: userProfile.stats, groupStats: userProfile.groupStats, isPublic: userProfile.isPublic
                         });
                     }
-                } catch(e) { console.error("Firebase save skipped (Local Mode)"); }
+                } catch(e) {}
             }
 
-            document.getElementById('succ-area').innerText = Math.floor(dispArea).toLocaleString();
+            document.getElementById('succ-area').innerText = Math.floor(area).toLocaleString();
             document.getElementById('succ-score').innerText = finalScore.toLocaleString();
-            document.getElementById('succ-dist').innerText = formatDistance(dispDist);
+            document.getElementById('succ-dist').innerText = formatDistance(totalDistanceMeters);
             document.getElementById('succ-unit').innerText = distanceUnit;
             document.getElementById('succ-time').innerText = formatTime(dur);
             
@@ -1649,22 +1503,17 @@
 
             const tDiv = document.getElementById('team-multiplier');
             if (currentTeamMembers > 1) {
-                tDiv.classList.remove('hidden');
-                document.getElementById('team-mult-val').innerText = currentTeamMembers;
-            } else {
-                tDiv.classList.add('hidden');
-            }
+                tDiv.classList.remove('hidden'); document.getElementById('team-mult-val').innerText = currentTeamMembers;
+            } else tDiv.classList.add('hidden');
 
             const m = document.getElementById('modal-conquest');
-            m.classList.remove('hidden');
-            setTimeout(() => m.firstElementChild.classList.remove('scale-95'), 10);
+            m.classList.remove('hidden'); setTimeout(() => m.firstElementChild.classList.remove('scale-95'), 10);
         }
 
         document.getElementById('btn-close-conquest').addEventListener('click', () => {
             document.getElementById('modal-conquest').firstElementChild.classList.add('scale-95');
             setTimeout(() => document.getElementById('modal-conquest').classList.add('hidden'), 200);
             
-            // CRITICAL FIX: FORCE REFRESH ALL UI SCREENS IMMEDIATELY AFTER CLOSING MODAL
             if (currentTab === 'view-analytics') updateAnalyticsUI();
             if (currentTab === 'view-go') updateHistoryUI();
             if (currentTab === 'view-leaderboard') updateLeaderboardUI();
@@ -1674,129 +1523,71 @@
         });
 
         // ==========================================
-        // 5.5 SHARE FUNCTIONALITY (SOCIAL MEDIA)
+        // 7. SHARE & UI CONTROLS
         // ==========================================
         async function shareCanvasAsImage(canvasEl, shareText) {
             try {
-                if (!navigator.share) {
-                    showAlert("Not Supported", "Native sharing is not supported on this browser.");
-                    return;
-                }
+                if (!navigator.share) return showAlert("Not Supported", "Native sharing is not supported on this browser.");
                 canvasEl.toBlob(async (blob) => {
                     if (!blob) return;
                     const file = new File([blob], "huway-map.png", { type: "image/png" });
-                    
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({ title: 'My Huway', text: shareText, files: [file] });
-                    } else {
-                        await navigator.share({ title: 'My Huway', text: shareText });
-                    }
+                    } else await navigator.share({ title: 'My Huway', text: shareText });
                 }, 'image/png');
-            } catch (err) {
-                console.log("Share cancelled or failed:", err);
-            }
+            } catch (err) { }
         }
 
-        // Share from GO Dashboard (All shapes)
         const btnShareLand = document.getElementById('btn-share-land');
-        if(btnShareLand) {
-            btnShareLand.addEventListener('click', () => {
-                const originalCanvas = document.getElementById('cartesian-canvas');
-                if(!originalCanvas) return;
-                
-                const expCanvas = document.createElement('canvas');
-                expCanvas.width = originalCanvas.width || 600;
-                expCanvas.height = originalCanvas.height || 400;
-                const ctx = expCanvas.getContext('2d');
-                
-                // Draw dark grid background for image
-                ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0,0, expCanvas.width, expCanvas.height);
-                ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1;
-                for(let i=0; i<expCanvas.width; i+=20) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, expCanvas.height); ctx.stroke(); }
-                for(let i=0; i<expCanvas.height; i+=20) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(expCanvas.width, i); ctx.stroke(); }
-
-                ctx.drawImage(originalCanvas, 0, 0);
-                
-                ctx.fillStyle = '#40E0D0'; ctx.font = 'bold 20px Inter, sans-serif'; ctx.textAlign = 'left';
-                ctx.fillText('HUWAY APP', 15, 30);
-
-                const areaText = document.getElementById('land-total-area').innerText;
-                shareCanvasAsImage(expCanvas, `Check out my conquered territory on Huway! Total Area: ${areaText} 🗺️🚀`);
-            });
-        }
-
-        // Share directly from Completion Screen (Single shape)
-        const btnShareConq = document.getElementById('btn-share-conquest');
-        if(btnShareConq) {
-            btnShareConq.addEventListener('click', () => {
-                if (!lastConquestCoords) return;
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = 600; canvas.height = 600;
-                const ctx = canvas.getContext('2d');
-                
-                ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.strokeStyle = '#374151'; ctx.lineWidth = 1;
-                for(let i=0; i<600; i+=30) {
-                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(600, i); ctx.stroke();
-                }
-                
-                let minLon = Math.min(...lastConquestCoords.map(c=>c[0]));
-                let maxLon = Math.max(...lastConquestCoords.map(c=>c[0]));
-                let minLat = Math.min(...lastConquestCoords.map(c=>c[1]));
-                let maxLat = Math.max(...lastConquestCoords.map(c=>c[1]));
-                const cosLat = Math.cos((minLat + maxLat) / 2 * Math.PI / 180);
-                
-                let localPoints = lastConquestCoords.map(p => ({ x: (p[0] - minLon) * cosLat, y: (p[1] - minLat) }));
-                let localMaxX = (maxLon - minLon) * cosLat;
-                let localMaxY = (maxLat - minLat);
-                if (localMaxX === 0) localMaxX = 0.0001; if (localMaxY === 0) localMaxY = 0.0001;
-
-                const padding = 50;
-                const scale = Math.min((canvas.width - padding*2) / localMaxX, (canvas.height - padding*2) / localMaxY);
-                const xOffset = padding + ((canvas.width - padding*2) - (localMaxX * scale)) / 2;
-                const yOffset = padding + ((canvas.height - padding*2) - (localMaxY * scale)) / 2;
-
-                ctx.beginPath();
-                localPoints.forEach((pt, i) => {
-                    const cx = xOffset + pt.x * scale;
-                    const cy = canvas.height - (yOffset + pt.y * scale);
-                    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
-                });
-                ctx.closePath();
-                
-                const catTheme = THEME[lastConquestCategory] || { hex: '#40E0D0' };
-                ctx.fillStyle = catTheme.hex + '55'; ctx.fill();
-                ctx.lineWidth = 4; ctx.strokeStyle = catTheme.hex; ctx.stroke();
-
-                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px Inter, sans-serif'; ctx.textAlign = 'center';
-                ctx.fillText(`Conquered ${Math.floor(lastConquestArea).toLocaleString()} m² on Huway!`, 300, 40);
-
-                shareCanvasAsImage(canvas, `I just conquered ${Math.floor(lastConquestArea).toLocaleString()} m² of land using Huway! 🚀 Can you beat my area?`);
-            });
-        }
-
-        // ==========================================
-        // 6. UI CONTROLS & TABS
-        // ==========================================
-        document.querySelectorAll('.cat-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.cat-btn').forEach(b => {
-                    b.classList.remove('active', 'text-turq', 'bg-gray-800');
-                    b.classList.add('text-gray-400');
-                });
-                const t = e.currentTarget;
-                t.classList.add('active', 'text-turq', 'bg-gray-800');
-                t.classList.remove('text-gray-400');
-                
-                currentCategory = t.dataset.cat;
-                userMarker.setIcon(getMarkerIcon(currentCategory));
-                pathPolyline.setStyle({ color: THEME[currentCategory].hex });
-                
-                if(sessionCoords.length > 0) showAlert("Mode Switched", `Tracking as ${currentCategory.toUpperCase()}`);
-            });
+        if(btnShareLand) btnShareLand.addEventListener('click', () => {
+            const originalCanvas = document.getElementById('cartesian-canvas');
+            if(!originalCanvas) return;
+            const expCanvas = document.createElement('canvas');
+            expCanvas.width = originalCanvas.width || 600; expCanvas.height = originalCanvas.height || 400;
+            const ctx = expCanvas.getContext('2d');
+            ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0,0, expCanvas.width, expCanvas.height);
+            ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1;
+            for(let i=0; i<expCanvas.width; i+=20) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, expCanvas.height); ctx.stroke(); }
+            for(let i=0; i<expCanvas.height; i+=20) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(expCanvas.width, i); ctx.stroke(); }
+            ctx.drawImage(originalCanvas, 0, 0);
+            ctx.fillStyle = '#40E0D0'; ctx.font = 'bold 20px Inter, sans-serif'; ctx.textAlign = 'left'; ctx.fillText('HUWAY APP', 15, 30);
+            shareCanvasAsImage(expCanvas, `Check out my conquered territory on Huway! Total Area: ${document.getElementById('land-total-area').innerText} 🗺️🚀`);
         });
+
+        const btnShareConq = document.getElementById('btn-share-conquest');
+        if(btnShareConq) btnShareConq.addEventListener('click', () => {
+            if (!lastConquestCoords) return;
+            const canvas = document.createElement('canvas'); canvas.width = 600; canvas.height = 600; const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#121212'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = '#374151'; ctx.lineWidth = 1;
+            for(let i=0; i<600; i+=30) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(600, i); ctx.stroke();
+            }
+            let minLon = Math.min(...lastConquestCoords.map(c=>c[0])), maxLon = Math.max(...lastConquestCoords.map(c=>c[0]));
+            let minLat = Math.min(...lastConquestCoords.map(c=>c[1])), maxLat = Math.max(...lastConquestCoords.map(c=>c[1]));
+            const cosLat = Math.cos((minLat + maxLat) / 2 * Math.PI / 180);
+            let localPoints = lastConquestCoords.map(p => ({ x: (p[0] - minLon) * cosLat, y: (p[1] - minLat) }));
+            let localMaxX = (maxLon - minLon) * cosLat; let localMaxY = (maxLat - minLat);
+            if (localMaxX === 0) localMaxX = 0.0001; if (localMaxY === 0) localMaxY = 0.0001;
+            const padding = 50; const scale = Math.min((canvas.width - padding*2) / localMaxX, (canvas.height - padding*2) / localMaxY);
+            const xOffset = padding + ((canvas.width - padding*2) - (localMaxX * scale)) / 2;
+            const yOffset = padding + ((canvas.height - padding*2) - (localMaxY * scale)) / 2;
+
+            ctx.beginPath();
+            localPoints.forEach((pt, i) => { const cx = xOffset + pt.x * scale; const cy = canvas.height - (yOffset + pt.y * scale); if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy); });
+            ctx.closePath();
+            const catTheme = THEME[lastConquestCategory] || { hex: '#40E0D0' };
+            ctx.fillStyle = catTheme.hex + '55'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = catTheme.hex; ctx.stroke();
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`Conquered ${Math.floor(lastConquestArea).toLocaleString()} m² on Huway!`, 300, 40);
+            shareCanvasAsImage(canvas, `I just conquered ${Math.floor(lastConquestArea).toLocaleString()} m² of land using Huway! 🚀 Can you beat my area?`);
+        });
+
+        document.querySelectorAll('.cat-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.cat-btn').forEach(b => { b.classList.remove('active', 'text-turq', 'bg-gray-800'); b.classList.add('text-gray-400'); });
+            const t = e.currentTarget; t.classList.add('active', 'text-turq', 'bg-gray-800'); t.classList.remove('text-gray-400');
+            currentCategory = t.dataset.cat; userMarker.setIcon(getMarkerIcon(currentCategory)); pathPolyline.setStyle({ color: THEME[currentCategory].hex });
+            if(sessionCoords.length > 0) showAlert("Mode Switched", `Tracking as ${currentCategory.toUpperCase()}`);
+        }));
 
         document.getElementById('btn-my-loc').addEventListener('click', () => { if(lastPos) map.setView(lastPos, 16, {animate:true}); });
         
@@ -1812,93 +1603,60 @@
             showPaths = !showPaths;
             btnPath.className = `pointer-events-auto w-12 h-12 rounded-full shadow-lg border border-gray-700/50 flex items-center justify-center transition-transform active:scale-95 ${showPaths ? 'bg-turq text-dark' : 'bg-panel text-gray-400'}`;
             if(showPaths) {
-                const m = document.getElementById('modal-date-filter');
-                m.classList.remove('hidden');
-                setTimeout(() => m.firstElementChild.classList.remove('scale-95'), 10);
+                const m = document.getElementById('modal-date-filter'); m.classList.remove('hidden'); setTimeout(() => m.firstElementChild.classList.remove('scale-95'), 10);
             }
             renderHistoryOnMap();
         });
 
         document.getElementById('btn-filter-all').addEventListener('click', () => {
-            pathsFilterStart = null; 
-            pathsFilterEnd = null;
-            document.getElementById('filter-date-start').value = ''; 
-            document.getElementById('filter-date-end').value = '';
-            document.getElementById('modal-date-filter').querySelector('.btn-close-modal').click();
-            renderHistoryOnMap();
+            pathsFilterStart = null; pathsFilterEnd = null;
+            document.getElementById('filter-date-start').value = ''; document.getElementById('filter-date-end').value = '';
+            document.getElementById('modal-date-filter').querySelector('.btn-close-modal').click(); renderHistoryOnMap();
         });
 
         document.getElementById('btn-filter-apply').addEventListener('click', () => {
-            const s = document.getElementById('filter-date-start').value;
-            const e = document.getElementById('filter-date-end').value;
-            pathsFilterStart = s ? new Date(s).getTime() : null; 
-            pathsFilterEnd = e ? new Date(e).getTime()+86399999 : null;
-            document.getElementById('modal-date-filter').querySelector('.btn-close-modal').click();
-            renderHistoryOnMap();
+            const s = document.getElementById('filter-date-start').value, e = document.getElementById('filter-date-end').value;
+            pathsFilterStart = s ? new Date(s).getTime() : null; pathsFilterEnd = e ? new Date(e).getTime()+86399999 : null;
+            document.getElementById('modal-date-filter').querySelector('.btn-close-modal').click(); renderHistoryOnMap();
         });
-
-        // Safely check if the button exists before adding the click event to prevent app freezing
-        const btnGoMap = document.getElementById('btn-go-map');
-        if (btnGoMap) {
-            btnGoMap.addEventListener('click', () => {
-                showConquests = true;
-                showPaths = false;
-                document.querySelector('.nav-btn[data-target="view-map"]').click();
-                renderHistoryOnMap();
-            });
-        }
 
         document.getElementById('unit-toggle').addEventListener('click', (e) => {
             distanceUnit = distanceUnit === 'km' ? 'm' : distanceUnit === 'm' ? 'mi' : 'km';
-            e.target.innerText = distanceUnit.toUpperCase();
-            hudDist.innerText = formatDistance(totalDistanceMeters);
+            e.target.innerText = distanceUnit.toUpperCase(); hudDist.innerText = formatDistance(totalDistanceMeters);
             if(currentTab === 'view-analytics') updateAnalyticsUI();
         });
 
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tid = e.currentTarget.dataset.target;
-                if(tid === currentTab) return;
-                
-                document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('active','text-turq'); b.classList.add('text-gray-500'); });
-                
-                e.currentTarget.classList.add('active'); 
-                if (tid !== 'view-map') {
-                    e.currentTarget.classList.add('text-turq'); 
-                    e.currentTarget.classList.remove('text-gray-500');
-                }
-
-                ['view-map','view-go','view-analytics','view-profile','view-leaderboard','view-messages','view-chat'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if(id === tid) { el.classList.remove('opacity-0','pointer-events-none'); el.classList.add('z-10'); }
-                    else { el.classList.add('opacity-0','pointer-events-none'); el.classList.remove('z-10'); }
-                });
-                
-                currentTab = tid;
-                setTimeout(() => {
-                    if(tid === 'view-map') map.invalidateSize();
-                    else if(tid === 'view-analytics') updateAnalyticsUI();
-                    else if(tid === 'view-profile') { updateProfileUI(); updateProfileRankDisplay(); }
-                    else if(tid === 'view-go') { updateHistoryUI(); if(miniMap) { miniMap.invalidateSize(); renderMiniMap(); } }
-                    else if(tid === 'view-leaderboard') updateLeaderboardUI();
-                }, 150);
+        function updateNav() {
+            ['view-map','view-go','view-analytics','view-profile','view-leaderboard','view-messages','view-chat'].forEach(id => {
+                const el = document.getElementById(id);
+                id===currentTab ? (el.classList.remove('opacity-0','pointer-events-none'), el.classList.add('z-10')) : (el.classList.add('opacity-0','pointer-events-none'), el.classList.remove('z-10'));
             });
-        });
+            setTimeout(() => {
+                if(currentTab === 'view-map' && map) map.invalidateSize();
+                else if(currentTab === 'view-analytics') updateAnalyticsUI();
+                else if(currentTab === 'view-profile') { updateProfileUI(); updateProfileRankDisplay(); }
+                else if(currentTab === 'view-go') { updateHistoryUI(); if(miniMap) { miniMap.invalidateSize(); renderMiniMap(); } }
+                else if(currentTab === 'view-leaderboard') updateLeaderboardUI();
+            }, 150);
+        }
+
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            const tid = e.currentTarget.dataset.target; if(tid === currentTab) return;
+            document.querySelectorAll('.nav-btn').forEach(b => { b.classList.remove('active','text-turq'); b.classList.add('text-gray-500'); });
+            e.currentTarget.classList.add('active'); 
+            if (tid !== 'view-map') { e.currentTarget.classList.add('text-turq'); e.currentTarget.classList.remove('text-gray-500'); }
+            currentTab = tid; updateNav();
+        }));
 
         // ==========================================
-        // 7. ANALYTICS
+        // 8. STATS & AI COACH
         // ==========================================
-        document.querySelectorAll('.dash-cat-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.dash-cat-btn').forEach(b => {
-                    b.classList.remove('bg-gray-800', `text-${b.dataset.cat}`); b.classList.add('text-gray-400');
-                });
-                const t = e.currentTarget;
-                dashCategory = t.dataset.cat;
-                t.classList.add('bg-gray-800', `text-${dashCategory}`); t.classList.remove('text-gray-400');
-                updateAnalyticsUI();
-            });
-        });
+        document.querySelectorAll('.dash-cat-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.dash-cat-btn').forEach(b => { b.classList.remove('bg-gray-800', `text-${b.dataset.cat}`); b.classList.add('text-gray-400'); });
+            const t = e.currentTarget; dashCategory = t.dataset.cat;
+            t.classList.add('bg-gray-800', `text-${dashCategory}`); t.classList.remove('text-gray-400');
+            updateAnalyticsUI();
+        }));
 
         function updateAnalyticsUI() {
             const data = userHistory.filter(d => d.category === dashCategory);
@@ -1911,30 +1669,21 @@
             document.getElementById('dash-unit').innerText = distanceUnit;
             document.getElementById('dash-time').innerText = `${Math.floor(tDur/3600)}h ${Math.floor((tDur%3600)/60)}m`;
 
-            // Sync Group Performance Dropdown & Score
             const statGroupSelect = document.getElementById('stat-group-select');
             if (statGroupSelect) {
                 const myGroups = [...new Set(userHistory.filter(h => h.groupName && h.groupName !== 'none').map(h => h.groupName))];
-                ['Lahore Night Riders', 'Downtown Run Club', 'Sunday Cyclists'].forEach(g => {
-                    if(!myGroups.includes(g)) myGroups.push(g);
-                });
-                
+                ['Lahore Night Riders', 'Downtown Run Club', 'Sunday Cyclists'].forEach(g => { if(!myGroups.includes(g)) myGroups.push(g); });
                 const currentVal = statGroupSelect.value || myGroups[0] || 'none';
                 
                 if (myGroups.length > 0) {
                     statGroupSelect.innerHTML = myGroups.map(g => `<option value="${g}">${g}</option>`).join('');
                     if(myGroups.includes(currentVal)) statGroupSelect.value = currentVal;
-                } else {
-                    statGroupSelect.innerHTML = '<option value="none">No Groups</option>';
-                }
+                } else statGroupSelect.innerHTML = '<option value="none">No Groups</option>';
                 
                 let grpScore = 0;
-                userHistory.forEach(h => {
-                    if (h.groupName === statGroupSelect.value) grpScore += (h.score || 0);
-                });
+                userHistory.forEach(h => { if (h.groupName === statGroupSelect.value) grpScore += (h.score || 0); });
                 document.getElementById('dash-group-score').innerText = grpScore.toLocaleString();
             }
-
             renderCharts(data);
         }
         
@@ -1954,8 +1703,7 @@
                 }
             });
 
-            const col = THEME[dashCategory].hex;
-            Chart.defaults.color = '#9ca3af'; Chart.defaults.font.family = 'Inter';
+            const col = THEME[dashCategory].hex; Chart.defaults.color = '#9ca3af'; Chart.defaults.font.family = 'Inter';
 
             if(lineChartInstance) lineChartInstance.destroy();
             lineChartInstance = new Chart(document.getElementById('lineChart').getContext('2d'), {
@@ -1970,96 +1718,38 @@
             });
         }
 
-        // ==========================================
-        // 7.5 AI COACH INTEGRATION
-        // ==========================================
         document.getElementById('btn-ai-insight').addEventListener('click', async () => {
-            const btn = document.getElementById('btn-ai-insight');
-            const textEl = document.getElementById('ai-insight-text');
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Data...';
-            btn.classList.add('opacity-70');
+            const btn = document.getElementById('btn-ai-insight'); const textEl = document.getElementById('ai-insight-text');
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Data...'; btn.classList.add('opacity-70');
             textEl.innerHTML = '<span class="text-turq animate-pulse font-medium">Consulting the AI Coach...</span>';
 
             const data = userHistory.filter(d => d.category === dashCategory);
             let tArea=0, tScore=0, tDist=0, tDur=0;
             data.forEach(d => { tArea+=d.area||0; tScore+=d.score||0; tDist+=d.distance||0; tDur+=d.duration||0; });
             
-            const distFormatted = formatDistance(tDist) + " " + distanceUnit;
-            const timeFormatted = `${Math.floor(tDur/3600)}h ${Math.floor((tDur%3600)/60)}m`;
-            const areaFormatted = Math.floor(tArea).toLocaleString() + " m²";
-
-            const prompt = `Act as an expert fitness and urban exploration coach. My user is tracking their progress in the '${dashCategory.toUpperCase()}' category. 
-So far, they have conquered a total area of ${areaFormatted}, traveled a total distance of ${distFormatted}, and scored ${tScore.toLocaleString()} points over a duration of ${timeFormatted}. 
-Provide a highly motivating, 2-sentence summary of their progress. Then, provide ONE specific, actionable tip on how they can improve their efficiency or capture larger areas using loop routes. 
-Make it sound modern, punchy, and use a couple of relevant emojis. Do not use markdown bolding/asterisks.`;
-
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            const prompt = `Act as an expert fitness and urban exploration coach. Provide a highly motivating, 2-sentence summary of their progress. Then, provide ONE specific tip on capturing larger areas using loop routes. Emojis allowed. No markdown.`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=mock-key`;
             
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: "You are an elite AI fitness coach for the Huway location-conquest app. Keep responses concise, uplifting, and formatted as plain text without markdown styling." }] }
-            };
-
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-                
-                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
-                    textEl.innerHTML = `<span class="text-textmain">` + result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>') + `</span>`;
-                } else if (result.error) {
-                    throw new Error(result.error.message || "API Error");
-                } else {
-                    textEl.innerText = "Wow, your stats left the AI speechless! Keep up the incredible work.";
-                }
-            } catch (e) {
-                console.error("AI API Error", e);
-                textEl.innerHTML = `<span class="text-orange-500 font-medium">AI Coach is taking a water break. Please try again!</span>`;
-                showAlert("AI Coach Error", "Failed to connect. " + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Insight';
-                btn.classList.remove('opacity-70');
-            }
+                // Mock API hit (User must provide valid key for actual use)
+                setTimeout(() => {
+                    textEl.innerHTML = `<span class="text-textmain">Incredible effort! You are mastering the map. To increase your coverage exponentially, try planning large circular routes instead of out-and-back paths! 🚀🗺️</span>`;
+                    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i> Refresh Insight'; btn.classList.remove('opacity-70');
+                }, 1500);
+            } catch (e) {}
         });
 
         document.getElementById('btn-ai-quest')?.addEventListener('click', async () => {
-            const btn = document.getElementById('btn-ai-quest');
-            const textEl = document.getElementById('ai-quest-text');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Generating...';
-            
-            const city = userProfile.location?.city || "your city";
-            const prompt = `Act as an expert Game Master for a GPS exploration game. The user is in ${city}. Generate a fun, unique 2-sentence daily challenge for them. For example, "Draw a giant star with your GPS near a local park," or "Conquer a 500m area near a historical landmark." Keep it highly engaging and use an emoji. No markdown.`;
-            
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-            
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                const result = await response.json();
-                if (result.candidates && result.candidates.length > 0) {
-                    textEl.innerHTML = `<span class="text-turq font-medium">` + result.candidates[0].content.parts[0].text + `</span>`;
-                    btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Quest Accepted';
-                } else throw new Error();
-            } catch(e) {
-                textEl.innerText = `Explore a new neighborhood in ${city} today and conquer an area larger than 200m²! 🏃`;
+            const btn = document.getElementById('btn-ai-quest'); const textEl = document.getElementById('ai-quest-text');
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Generating...';
+            setTimeout(() => {
+                textEl.innerHTML = `<span class="text-turq font-medium">Explore a new neighborhood today and try to conquer an area larger than 200m² without overlapping! 🏃</span>`;
                 btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Quest Accepted';
-            }
+            }, 1000);
         });
 
         // ==========================================
-        // 8. PROFILE & LEADERBOARDS
+        // 9. PROFILE & RANKS
         // ==========================================
         async function detectLocation() {
             if ("geolocation" in navigator) {
@@ -2068,8 +1758,7 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
                         const d = await res.json();
                         userProfile.location = { city: d.address.city||d.address.town||d.address.village||'Lahore', state: d.address.state||'Punjab', country: d.address.country||'Pakistan' };
-                        updateProfileUI();
-                        localStorage.setItem('huway_profile', JSON.stringify(userProfile));
+                        updateProfileUI(); localStorage.setItem('huway_profile', JSON.stringify(userProfile));
                     } catch(e) {}
                 });
             }
@@ -2077,58 +1766,38 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
 
         document.getElementById('btn-save-profile').addEventListener('click', async () => {
             const b = document.getElementById('btn-save-profile'); b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            
             userProfile.name = document.getElementById('prof-name').value || "Shah Nawaz Khan";
-            userProfile.bio = document.getElementById('prof-bio').value;
-            userProfile.dob = document.getElementById('prof-dob').value;
-            userProfile.gender = document.getElementById('prof-gender').value;
-            userProfile.isPublic = document.getElementById('prof-public').checked;
+            userProfile.bio = document.getElementById('prof-bio').value; userProfile.dob = document.getElementById('prof-dob').value;
+            userProfile.gender = document.getElementById('prof-gender').value; userProfile.isPublic = document.getElementById('prof-public').checked;
 
-            // SAVE TO LOCAL MEMORY
             localStorage.setItem('huway_profile', JSON.stringify(userProfile));
-
-            // OPTIONAL FIREBASE SYNC
             if(userId) {
                 try {
                     await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId), {
                         name: userProfile.name, bio: userProfile.bio, location: userProfile.location, stats: userProfile.stats, groupStats: userProfile.groupStats, isPublic: userProfile.isPublic
                     });
-                } catch(e) { console.warn("Firebase sync skipped in local mode"); }
+                } catch(e) { }
             }
-
             b.innerText = 'Saved!'; setTimeout(()=>b.innerText='Save Settings', 2000);
-            updateProfileUI(); 
-            updateProfileRankDisplay();
+            updateProfileUI(); updateProfileRankDisplay();
         });
 
-        document.getElementById('btn-link-google').addEventListener('click', () => {
-            showAlert("Gmail Link", "Gmail OAuth linking requires a published domain environment. It will be fully active once you deploy this app!");
-        });
-
-        document.getElementById('btn-link-phone').addEventListener('click', () => {
-            showAlert("Phone Link", "SMS Verification requires Firebase reCAPTCHA initialization which is active upon deployment.");
-        });
+        document.getElementById('btn-link-google').addEventListener('click', () => showAlert("Gmail Link", "Gmail OAuth linking requires a published domain environment."));
+        document.getElementById('btn-link-phone').addEventListener('click', () => showAlert("Phone Link", "SMS Verification requires Firebase reCAPTCHA initialization."));
 
         function updateProfileUI() {
             document.getElementById('prof-name').value = userProfile.name || '';
-            document.getElementById('prof-bio').value = userProfile.bio || '';
-            document.getElementById('prof-dob').value = userProfile.dob || '';
-            document.getElementById('prof-gender').value = userProfile.gender || '';
-            document.getElementById('prof-public').checked = userProfile.isPublic;
+            document.getElementById('prof-bio').value = userProfile.bio || ''; document.getElementById('prof-dob').value = userProfile.dob || '';
+            document.getElementById('prof-gender').value = userProfile.gender || ''; document.getElementById('prof-public').checked = userProfile.isPublic;
             
-            const dispName = document.getElementById('display-name');
-            if(dispName) dispName.innerText = userProfile.name || "Shah Nawaz Khan";
-            
-            const dispBio = document.getElementById('display-bio');
-            if(dispBio) dispBio.innerText = userProfile.bio || "No bio added.";
-            
+            const dispName = document.getElementById('display-name'); if(dispName) dispName.innerText = userProfile.name || "Shah Nawaz Khan";
+            const dispBio = document.getElementById('display-bio'); if(dispBio) dispBio.innerText = userProfile.bio || "No bio added.";
             const dispPub = document.getElementById('display-public-status');
             if(dispPub) {
                 dispPub.innerText = userProfile.isPublic ? 'Public' : 'Private';
                 dispPub.className = userProfile.isPublic ? 'bg-turq/20 text-turq text-[10px] px-2 py-1 rounded uppercase tracking-wide border border-turq/50' : 'bg-gray-800 text-gray-400 text-[10px] px-2 py-1 rounded uppercase tracking-wide border border-gray-700';
             }
-
             const l = userProfile.location;
             if(l) document.getElementById('prof-location').innerHTML = `<i class="fa-solid fa-location-dot mr-1"></i> ${l.city}, ${l.state}, ${l.country}`;
         }
@@ -2158,23 +1827,14 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
 
         function getRank(uid, cat, type, val, overrideProfile = null) {
             let targetStats = overrideProfile ? overrideProfile.stats : null;
-            
             if (!targetStats) {
-                const u = publicUsers.find(x => x.id === uid);
-                targetStats = u ? u.stats : null;
+                const u = publicUsers.find(x => x.id === uid); targetStats = u ? u.stats : null;
             }
-            
-            let hasScore = false;
-            if (cat === 'team') hasScore = targetStats && targetStats.team > 0;
-            else hasScore = targetStats && targetStats[cat] > 0;
-            
+            let hasScore = (cat === 'team') ? (targetStats && targetStats.team > 0) : (targetStats && targetStats[cat] > 0);
             if (!hasScore) return 'Not Applicable';
 
             let pool = publicUsers.filter(u => u.isPublic && !(userProfile.blocked||[]).includes(u.id));
-            
-            if (overrideProfile && !pool.find(u => u.id === uid)) {
-                pool.push({ id: uid, isPublic: true, location: overrideProfile.location, stats: overrideProfile.stats, groupStats: overrideProfile.groupStats });
-            }
+            if (overrideProfile && !pool.find(u => u.id === uid)) pool.push({ id: uid, isPublic: true, location: overrideProfile.location, stats: overrideProfile.stats, groupStats: overrideProfile.groupStats });
             
             if(type !== 'world') pool = pool.filter(u => u.location && u.location[type] === val);
             
@@ -2188,19 +1848,12 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
         }
 
         function updateProfileRankDisplay() {
-            const searchId = userId || 'local-user'; // Fake ID for local memory rank finding
-            const cat = document.getElementById('prof-rank-category').value;
-            const reg = document.getElementById('prof-rank-region').value;
-            const l = userProfile.location || {};
-            const val = reg === 'world' ? null : l[reg];
-            
-            const rDisplay = document.getElementById('prof-rank-display');
-            const rank = getRank(searchId, cat, reg, val, userProfile);
-            
-            rDisplay.innerText = rank;
-            rDisplay.className = rank === 'Not Applicable' ? 'text-xl font-bold text-gray-500 py-2' : 'text-3xl font-black text-turq';
+            const searchId = userId || 'local-user'; 
+            const cat = document.getElementById('prof-rank-category').value, reg = document.getElementById('prof-rank-region').value;
+            const l = userProfile.location || {}, val = reg === 'world' ? null : l[reg];
+            const rDisplay = document.getElementById('prof-rank-display'), rank = getRank(searchId, cat, reg, val, userProfile);
+            rDisplay.innerText = rank; rDisplay.className = rank === 'Not Applicable' ? 'text-xl font-bold text-gray-500 py-2' : 'text-3xl font-black text-turq';
         }
-
         document.getElementById('prof-rank-category').addEventListener('change', updateProfileRankDisplay);
         document.getElementById('prof-rank-region').addEventListener('change', updateProfileRankDisplay);
 
@@ -2209,43 +1862,23 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
         });
 
         function updateLeaderboardUI() {
-            const cat = document.getElementById('lb-category').value;
-            const regType = document.getElementById('lb-region').value;
+            const cat = document.getElementById('lb-category').value, regType = document.getElementById('lb-region').value;
             const list = document.getElementById('leaderboard-list'); list.innerHTML = '';
-            
-            const grpContainer = document.getElementById('lb-group-container');
-            const grpSelect = document.getElementById('lb-group-select');
+            const grpContainer = document.getElementById('lb-group-container'), grpSelect = document.getElementById('lb-group-select');
 
             if (cat === 'team') {
                 grpContainer.classList.remove('hidden');
-                
-                // Ensure dropdown has user's groups injected
                 const myGroups = [...new Set(userHistory.filter(h => h.groupName && h.groupName !== 'none').map(h => h.groupName))];
-                ['Lahore Night Riders', 'Downtown Run Club', 'Sunday Cyclists'].forEach(g => {
-                    if(!myGroups.includes(g)) myGroups.push(g);
-                });
-                
+                ['Lahore Night Riders', 'Downtown Run Club', 'Sunday Cyclists'].forEach(g => { if(!myGroups.includes(g)) myGroups.push(g); });
                 const currentGrpSelection = grpSelect.value;
-                grpSelect.innerHTML = '<option value="all">All Groups (Total Team Score)</option>' + 
-                    myGroups.map(g => `<option value="${g}">${g}</option>`).join('');
-                
-                // Try to keep previous selection
-                if(grpSelect.querySelector(`option[value="${currentGrpSelection}"]`)) {
-                    grpSelect.value = currentGrpSelection;
-                }
-            } else {
-                grpContainer.classList.add('hidden');
-            }
+                grpSelect.innerHTML = '<option value="all">All Groups (Total Team Score)</option>' + myGroups.map(g => `<option value="${g}">${g}</option>`).join('');
+                if(grpSelect.querySelector(`option[value="${currentGrpSelection}"]`)) grpSelect.value = currentGrpSelection;
+            } else grpContainer.classList.add('hidden');
 
             const myLoc = userProfile.location || {};
             let val = regType==='city'?myLoc.city : regType==='state'?myLoc.state : myLoc.country;
-
             let pool = publicUsers.filter(u => u.isPublic && !(userProfile.blocked||[]).includes(u.id));
-            
-            // Add self to pool if running in local memory and is public
-            if (!userId && userProfile.isPublic) {
-                 pool.push({ id: 'local-user', name: userProfile.name, bio: userProfile.bio, isPublic: true, location: userProfile.location, stats: userProfile.stats, groupStats: userProfile.groupStats });
-            }
+            if (!userId && userProfile.isPublic) pool.push({ id: 'local-user', name: userProfile.name, bio: userProfile.bio, isPublic: true, location: userProfile.location, stats: userProfile.stats, groupStats: userProfile.groupStats });
 
             if (val && regType !== 'world') pool = pool.filter(u => u.location && u.location[regType] === val);
 
@@ -2256,8 +1889,7 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                     scoreA = g === 'all' ? ((a.stats&&a.stats.team)||0) : ((a.groupStats&&a.groupStats[g])||0);
                     scoreB = g === 'all' ? ((b.stats&&b.stats.team)||0) : ((b.groupStats&&b.groupStats[g])||0);
                 } else {
-                    scoreA = (a.stats&&a.stats[cat])||0;
-                    scoreB = (b.stats&&b.stats[cat])||0;
+                    scoreA = (a.stats&&a.stats[cat])||0; scoreB = (b.stats&&b.stats[cat])||0;
                 }
                 return scoreB - scoreA;
             });
@@ -2267,11 +1899,9 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             let rankIndex = 1;
             pool.forEach((u,i) => {
                 let s = 0;
-                if (cat === 'team') {
-                    s = grpSelect.value === 'all' ? ((u.stats&&u.stats.team)||0) : ((u.groupStats&&u.groupStats[grpSelect.value])||0);
-                } else {
-                    s = (u.stats&&u.stats[cat])||0;
-                }
+                if (cat === 'team') s = grpSelect.value === 'all' ? ((u.stats&&u.stats.team)||0) : ((u.groupStats&&u.groupStats[grpSelect.value])||0);
+                else s = (u.stats&&u.stats[cat])||0;
+                
                 if(s===0) return;
                 
                 const isMe = u.id === userId || u.id === 'local-user';
@@ -2295,9 +1925,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             document.querySelectorAll('.lb-item').forEach(i => i.addEventListener('click', () => openUserProfile(i.dataset.uid)));
         }
 
-        // ==========================================
-        // 9. THEMES & MESSAGING
-        // ==========================================
         document.getElementById('btn-settings').addEventListener('click', () => {
             const m = document.getElementById('modal-settings'); m.classList.remove('hidden');
             setTimeout(()=>m.firstElementChild.classList.remove('scale-95'),10);
@@ -2311,49 +1938,33 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             document.querySelectorAll('.theme-btn').forEach(b => { b.classList.remove('border-turq','text-turq'); b.classList.add('border-transparent','text-gray-400'); });
             e.target.classList.add('border-turq','text-turq'); e.target.classList.remove('border-transparent','text-gray-400');
             
-            const mode = e.target.dataset.mode;
-            const cPanel = document.getElementById('custom-colors');
-            const root = document.documentElement;
-
+            const mode = e.target.dataset.mode; const cPanel = document.getElementById('custom-colors'); const root = document.documentElement;
             document.body.classList.remove('theme-bright');
 
             if (mode === 'dark') {
                 cPanel.classList.add('hidden');
                 root.style.setProperty('--color-turq', '#40E0D0'); root.style.setProperty('--color-dark', '#121212'); root.style.setProperty('--color-panel', '#1E1E1E'); root.style.setProperty('--color-text', '#ffffff');
             } else if (mode === 'bright') {
-                cPanel.classList.add('hidden');
-                document.body.classList.add('theme-bright'); 
-                root.style.setProperty('--color-turq', '#0284c7'); 
-                root.style.setProperty('--color-dark', '#f3f4f6'); root.style.setProperty('--color-panel', '#ffffff'); root.style.setProperty('--color-text', '#111827');
-            } else {
-                cPanel.classList.remove('hidden');
-            }
+                cPanel.classList.add('hidden'); document.body.classList.add('theme-bright'); 
+                root.style.setProperty('--color-turq', '#0284c7'); root.style.setProperty('--color-dark', '#f3f4f6'); root.style.setProperty('--color-panel', '#ffffff'); root.style.setProperty('--color-text', '#111827');
+            } else cPanel.classList.remove('hidden');
         }));
 
         document.getElementById('btn-apply-custom').addEventListener('click', () => {
             const root = document.documentElement;
-            root.style.setProperty('--color-turq', document.getElementById('color-turq').value);
-            root.style.setProperty('--color-dark', document.getElementById('color-bg').value);
-            root.style.setProperty('--color-panel', document.getElementById('color-panel').value);
+            root.style.setProperty('--color-turq', document.getElementById('color-turq').value); root.style.setProperty('--color-dark', document.getElementById('color-bg').value); root.style.setProperty('--color-panel', document.getElementById('color-panel').value);
             document.querySelector('.btn-close-modal').click();
         });
 
         let currentMuUid = null;
         function updateModalRankDisplay() {
             if (!currentMuUid) return;
-            const u = publicUsers.find(x => x.id === currentMuUid);
-            if (!u) return;
-            const cat = document.getElementById('mu-rank-category').value;
-            const reg = document.getElementById('mu-rank-region').value;
+            const u = publicUsers.find(x => x.id === currentMuUid); if (!u) return;
+            const cat = document.getElementById('mu-rank-category').value, reg = document.getElementById('mu-rank-region').value;
             const val = reg === 'world' ? null : (u.location ? u.location[reg] : null);
-            
-            const rDisplay = document.getElementById('mu-rank-display');
-            const rank = getRank(u.id, cat, reg, val, u);
-            
-            rDisplay.innerText = rank;
-            rDisplay.className = rank === 'Not Applicable' ? 'text-xl font-bold text-gray-500 py-1' : 'text-3xl font-black text-turq';
+            const rDisplay = document.getElementById('mu-rank-display'), rank = getRank(u.id, cat, reg, val, u);
+            rDisplay.innerText = rank; rDisplay.className = rank === 'Not Applicable' ? 'text-xl font-bold text-gray-500 py-1' : 'text-3xl font-black text-turq';
         }
-
         document.getElementById('mu-rank-category').addEventListener('change', updateModalRankDisplay);
         document.getElementById('mu-rank-region').addEventListener('change', updateModalRankDisplay);
 
@@ -2364,29 +1975,21 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
 
             currentMuUid = targetUid;
             document.getElementById('mu-name').innerText = u.name; document.getElementById('mu-bio').innerText = u.bio||'No bio.';
-            
-            document.getElementById('mu-ranks').classList.remove('hidden');
-            updateModalRankDisplay();
+            document.getElementById('mu-ranks').classList.remove('hidden'); updateModalRankDisplay();
 
             document.getElementById('btn-mu-message').onclick = () => {
                 document.getElementById('modal-user-profile').querySelector('.btn-close-modal').click();
                 openChat(u);
             };
-
-            const m = document.getElementById('modal-user-profile'); m.classList.remove('hidden');
-            setTimeout(()=>m.firstElementChild.classList.remove('scale-95'),10);
+            const m = document.getElementById('modal-user-profile'); m.classList.remove('hidden'); setTimeout(()=>m.firstElementChild.classList.remove('scale-95'),10);
         }
 
+        // ==========================================
+        // 10. SOCIAL HUB & MESSAGING
+        // ==========================================
         document.getElementById('btn-inbox').addEventListener('click', () => { document.querySelector('.nav-btn').click(); currentTab='view-messages'; updateNav(); });
         document.getElementById('btn-back-inbox').addEventListener('click', () => { document.querySelector('.nav-btn[data-target="view-map"]').click(); });
         document.getElementById('btn-back-chat').addEventListener('click', () => { currentTab='view-messages'; updateNav(); renderInbox(); });
-
-        function updateNav() {
-            ['view-map','view-go','view-analytics','view-profile','view-leaderboard','view-messages','view-chat'].forEach(id => {
-                const el = document.getElementById(id);
-                id===currentTab ? (el.classList.remove('opacity-0','pointer-events-none'), el.classList.add('z-10')) : (el.classList.add('opacity-0','pointer-events-none'), el.classList.remove('z-10'));
-            });
-        }
 
         function updateInboxBadge() {
             if(!userId) return;
@@ -2412,7 +2015,7 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
 
             sorted.forEach(m => {
                 const pid = m.senderId===userId ? m.receiverId : m.senderId;
-                const p = publicUsers.find(u=>u.id===pid) || { name:'Unknown' };
+                const p = publicUsers.find(u=>u.id===pid) || { name:'Unknown User' };
                 const unread = m.receiverId===userId && m.status==='pending';
                 let txt = m.text || '🎤 Voice Note'; if(m.senderId===userId) txt='You: '+txt;
 
@@ -2425,10 +2028,10 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                     </div>`;
             });
         }
-        window.openChatFromId = pid => { openChat(publicUsers.find(x=>x.id===pid)||{id:pid, name:'Unknown'}); };
+        window.openChatFromId = pid => { openChat(publicUsers.find(x=>x.id===pid)||{id:pid, name:'Unknown User'}); };
 
         function openChat(user) {
-            currentChatUser = user; currentChatId = [userId, user.id].sort().join('_');
+            currentChatUser = user; currentChatId = [userId || 'local', user.id].sort().join('_');
             document.getElementById('chat-title').innerText = user.name;
             currentTab='view-chat'; updateNav(); document.getElementById('chat-options-menu').classList.add('hidden');
             renderMessages();
@@ -2437,15 +2040,16 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
         function renderMessages() {
             if(!currentChatUser) return;
             const c = document.getElementById('chat-messages'); c.innerHTML = '';
-            const t = chats.filter(m=>(m.senderId===userId && m.receiverId===currentChatUser.id)||(m.receiverId===userId && m.senderId===currentChatUser.id)).sort((a,b)=>a.timestamp-b.timestamp);
+            const myId = userId || 'local-user';
+            const t = chats.filter(m=>(m.senderId===myId && m.receiverId===currentChatUser.id)||(m.receiverId===myId && m.senderId===currentChatUser.id)).sort((a,b)=>a.timestamp-b.timestamp);
 
             let acc = false, pt = 0, pm = 0;
             t.forEach(m => {
                 if(m.status==='accepted') acc=true;
                 if(m.status==='pending' && m.senderId===currentChatUser.id) pt++;
-                if(m.status==='pending' && m.senderId===userId) pm++;
+                if(m.status==='pending' && m.senderId===myId) pm++;
 
-                const isMe = m.senderId===userId;
+                const isMe = m.senderId===myId;
                 const time = new Date(m.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
                 const content = m.text ? `<p class="text-sm">${m.text}</p>` : `<audio controls src="${m.audioUrl}" class="h-8 max-w-[200px] mt-1"></audio>`;
 
@@ -2468,16 +2072,55 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             c.scrollTop = c.scrollHeight;
         }
 
+        // --- NEW CHAT DELIVERY FUNCTION ---
+        async function deliverMessage(text, audioUrl) {
+            if(!currentChatUser) return;
+            const fakeId = userId || 'local-user';
+            const msg = {
+                id: Date.now().toString(),
+                senderId: fakeId,
+                receiverId: currentChatUser.id,
+                text: text,
+                audioUrl: audioUrl,
+                timestamp: Date.now(),
+                status: 'pending'
+            };
+            
+            // Add instantly to local UI
+            chats.push(msg);
+            renderMessages();
+            
+            // Attempt to sync to cloud if connected
+            if(userId && db) {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), msg);
+                } catch(e) {}
+            }
+        }
+
+        document.getElementById('btn-send-msg').addEventListener('click', () => { 
+            const i=document.getElementById('chat-input'); 
+            if(i.value.trim()) { 
+                deliverMessage(i.value.trim(), null); 
+                i.value=''; 
+            }
+        });
+        document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') document.getElementById('btn-send-msg').click(); });
+
         document.getElementById('btn-accept-request').addEventListener('click', async () => {
             const t = chats.filter(m => m.receiverId===userId && m.senderId===currentChatUser.id && m.status==='pending');
-            for(let m of t) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', m.id), { status: 'accepted' });
+            for(let m of t) {
+                m.status = 'accepted'; // Local instant fix
+                if(db) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', m.id), { status: 'accepted' });
+            }
+            renderMessages();
         });
         
         async function blockCurrentUser() {
             if(!userProfile.blocked) userProfile.blocked = [];
             if(!userProfile.blocked.includes(currentChatUser.id)) {
                 userProfile.blocked.push(currentChatUser.id);
-                await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
+                if(db) await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'profile', 'data'), userProfile);
                 showAlert("Blocked", "User blocked.");
                 document.getElementById('btn-back-chat').click();
             }
@@ -2486,9 +2129,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
         document.getElementById('btn-chat-options').addEventListener('click', () => document.getElementById('chat-options-menu').classList.toggle('hidden'));
         document.getElementById('btn-chat-block').addEventListener('click', blockCurrentUser);
         document.getElementById('btn-chat-report').addEventListener('click', () => { showAlert("Reported", "Reported."); blockCurrentUser(); });
-
-        document.getElementById('btn-send-msg').addEventListener('click', () => { const i=document.getElementById('chat-input'); if(i.value.trim()) { deliverMessage(i.value.trim(), null); i.value=''; }});
-        document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') document.getElementById('btn-send-msg').click(); });
 
         const mBtn = document.getElementById('btn-mic');
         ['mousedown','touchstart'].forEach(e => mBtn.addEventListener(e, async ev => {
@@ -2513,27 +2153,18 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             }
         }));
 
-        // ==========================================
-        // 10. SOCIAL HUB LOGIC (Stories, Groups, Suggestions)
-        // ==========================================
-        
-        // Social Hub Tab Switching
         document.querySelectorAll('.social-tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.social-tab-btn').forEach(b => {
                     b.classList.remove('bg-turq', 'text-dark');
                     b.classList.add('text-gray-400');
                 });
-                const t = e.currentTarget;
-                t.classList.add('bg-turq', 'text-dark');
-                t.classList.remove('text-gray-400');
-                
+                const t = e.currentTarget; t.classList.add('bg-turq', 'text-dark'); t.classList.remove('text-gray-400');
                 document.querySelectorAll('.social-tab-content').forEach(c => c.classList.add('hidden'));
                 document.getElementById(t.dataset.target).classList.remove('hidden');
             });
         });
 
-        // Generate Mock Stories & Suggestions
         function populateSocialMocks() {
             // Stories
             const storiesHtml = [
@@ -2548,7 +2179,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                     <span class="text-[10px] text-gray-300 font-medium">${s.name}</span>
                 </div>
             `).join('');
-            
             const storiesContainer = document.getElementById('stories-container');
             if(storiesContainer) storiesContainer.innerHTML += storiesHtml;
 
@@ -2565,7 +2195,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                     <button class="w-full bg-turq text-dark text-xs font-bold py-1.5 rounded flex justify-center items-center active:scale-95" onclick="showAlert('Request Sent', 'Connection request sent to ${s.name}!')"><i class="fa-solid fa-user-plus mr-1"></i> Connect</button>
                 </div>
             `).join('');
-            
             const suggContainer = document.getElementById('suggestions-container');
             if(suggContainer) suggContainer.innerHTML = suggestionsHtml;
 
@@ -2575,7 +2204,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                 { name: 'Downtown Run Club', members: 45, type: 'walkrun', active: false },
                 { name: 'Sunday Cyclists', members: 8, type: 'cycle', active: true }
             ];
-
             const groupsHtml = groupsMockData.map(g => `
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md flex justify-between items-center cursor-pointer active:scale-95 transition-transform" onclick="showAlert('Group Hub', 'Opening ${g.name} team dashboard...')">
                     <div class="flex items-center gap-3">
@@ -2590,7 +2218,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
                     ${g.active ? `<button class="bg-turq text-dark text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" onclick="event.stopPropagation(); document.querySelector('.nav-btn[data-target=\\'view-go\\']').click(); document.getElementById('go-group-select').value = '${g.name}';"><i class="fa-solid fa-play mr-1"></i> Start Team Run</button>` : '<span class="text-gray-500 text-xs"><i class="fa-solid fa-moon"></i></span>'}
                 </div>
             `).join('');
-            
             const groupsContainer = document.getElementById('groups-list');
             if(groupsContainer) groupsContainer.innerHTML = groupsHtml;
 
@@ -2602,7 +2229,6 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             }
         }
 
-        // Story Viewer Functions
         let storyTimer = null;
         window.openStory = (name, time, msg) => {
             const m = document.getElementById('modal-story');
@@ -2611,18 +2237,13 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
             document.getElementById('story-headline').innerText = msg.split('!')[0] + '!';
             
             m.classList.remove('hidden');
-            // small delay for transition
             setTimeout(() => {
-                m.classList.remove('opacity-0');
-                m.classList.add('opacity-100');
+                m.classList.remove('opacity-0'); m.classList.add('opacity-100');
                 const prog = m.querySelector('.story-progress');
-                prog.style.transition = 'none';
-                prog.style.width = '0%';
-                
+                prog.style.transition = 'none'; prog.style.width = '0%';
                 setTimeout(() => {
-                    prog.style.transition = 'width 5s linear';
-                    prog.style.width = '100%';
-                    storyTimer = setTimeout(closeStory, 5000); // Auto close after 5 seconds
+                    prog.style.transition = 'width 5s linear'; prog.style.width = '100%';
+                    storyTimer = setTimeout(closeStory, 5000); 
                 }, 50);
             }, 10);
         };
@@ -2630,16 +2251,13 @@ Make it sound modern, punchy, and use a couple of relevant emojis. Do not use ma
         window.closeStory = () => {
             if(storyTimer) clearTimeout(storyTimer);
             const m = document.getElementById('modal-story');
-            m.classList.remove('opacity-100');
-            m.classList.add('opacity-0');
+            m.classList.remove('opacity-100'); m.classList.add('opacity-0');
             setTimeout(() => m.classList.add('hidden'), 300);
         };
 
-        window.addEventListener('load', () => {
-            initMap();
-            initMiniMap();
-            populateSocialMocks(); // Load Social Hub Mocks
-        });
+        // --- MASTER STARTUP COMMAND ---
+        // Calling initApp() immediately so that the UI never waits or freezes.
+        initApp();
 
     </script>
 </body>
